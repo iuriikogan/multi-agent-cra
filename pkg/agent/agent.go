@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	pb "cloud.google.com/go/ai/generativelanguage/apiv1beta/generativelanguagepb"
@@ -163,9 +164,18 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 		if !ok || len(candidates) == 0 {
 			return "", fmt.Errorf("no candidates in response")
 		}
-		candidate := candidates[0].(map[string]interface{})
-		content := candidate["content"].(map[string]interface{})
-		parts := content["parts"].([]interface{})
+		candidate, ok := candidates[0].(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("invalid candidate format")
+		}
+		content, ok := candidate["content"].(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("missing content in candidate")
+		}
+		parts, ok := content["parts"].([]interface{})
+		if !ok {
+			return "", fmt.Errorf("missing parts in content")
+		}
 
 		// Append model response to history immediately
 		// IMPORTANT: This preserves the 'thought_signature' received in 'parts'
@@ -216,7 +226,7 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 
 		// Append function responses to history
 		contents = append(contents, map[string]interface{}{
-			"role":  "user",
+			"role":  "function",
 			"parts": responseParts,
 		})
 	}
@@ -345,6 +355,8 @@ func (a *GeminiAgent) executeMockTool(ctx context.Context, name string, args map
 
 		// Transform to expected format (snake_case for main.go compatibility)
 		var result []map[string]interface{}
+		locationRegex := regexp.MustCompile(`/(locations|zones|regions)/([^/]+)`)
+
 		for _, asset := range assets {
 			entry := map[string]interface{}{
 				"name":       asset["name"],
@@ -353,30 +365,8 @@ func (a *GeminiAgent) executeMockTool(ctx context.Context, name string, args map
 			}
 			// Attempt to extract location from name if possible
 			nameStr, _ := asset["name"].(string)
-			if strings.Contains(nameStr, "/locations/") {
-				parts := strings.Split(nameStr, "/locations/")
-				if len(parts) > 1 {
-					sub := parts[1]
-					if idx := strings.Index(sub, "/"); idx != -1 {
-						entry["location"] = sub[:idx]
-					}
-				}
-			} else if strings.Contains(nameStr, "/zones/") {
-				parts := strings.Split(nameStr, "/zones/")
-				if len(parts) > 1 {
-					sub := parts[1]
-					if idx := strings.Index(sub, "/"); idx != -1 {
-						entry["location"] = sub[:idx]
-					}
-				}
-			} else if strings.Contains(nameStr, "/regions/") {
-				parts := strings.Split(nameStr, "/regions/")
-				if len(parts) > 1 {
-					sub := parts[1]
-					if idx := strings.Index(sub, "/"); idx != -1 {
-						entry["location"] = sub[:idx]
-					}
-				}
+			if match := locationRegex.FindStringSubmatch(nameStr); len(match) == 3 {
+				entry["location"] = match[2]
 			}
 
 			result = append(result, entry)
