@@ -1,8 +1,5 @@
 # Multi-Agent CRA System
 
-<<<<<<< HEAD
-#TODO
-=======
 This project implements a Multi-Agent System (MAS) for EU Cyber Resilience Act (CRA) compliance using Go and Google's Gemini API.
 
 ## Architecture
@@ -72,5 +69,3 @@ graph LR
 *   `--folder`: Target GCP Folder ID.
 *   `--org`: Target GCP Organization ID.
 *   `--log-level`: Set logging verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`).
-
->>>>>>> 28138c4 (updated agent.go, added tooling, created tests)
