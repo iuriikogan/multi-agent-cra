@@ -69,4 +69,3 @@ graph LR
 *   `--folder`: Target GCP Folder ID.
 *   `--org`: Target GCP Organization ID.
 *   `--log-level`: Set logging verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`).
-
