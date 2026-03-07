@@ -2,13 +2,7 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+Best Efforts Support on All Versions
 
 ## Reporting a Vulnerability
 
@@ -18,7 +12,7 @@ We take the security of our software seriously. If you believe you have found a 
 
 ### Reporting Process
 
-1.  Email your findings to **security@example.com**.
+1.  Email your findings to **ikogan@google.com**.
 2.  Include details about the vulnerability, steps to reproduce, and potential impact.
 3.  We will acknowledge receipt of your report within 48 hours.
 4.  We will work with you to understand and resolve the issue.
