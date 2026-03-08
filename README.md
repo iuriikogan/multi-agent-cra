@@ -14,6 +14,31 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   **AI-Powered:** Leverages Gemini 1.5 Pro for deep reasoning and compliance mapping.
 *   **Infrastructure as Code:** Full Terraform setup included.
 
+## 🏗️ System Architecture
+
+![System Architecture](architecture.png)
+
+The system is composed of the following key components:
+
+1.  **Frontend (Next.js):** A responsive web dashboard for triggering scans, viewing results, and managing compliance reports.
+2.  **Backend API (Go):** A RESTful API server that handles user requests, initiates scans via Pub/Sub, and queries Firestore for data.
+3.  **Worker (Go):** An autonomous worker service that consumes scan requests from Pub/Sub, orchestrates the AI agents, and performs the actual compliance assessments.
+4.  **Pub/Sub:** Acts as the asynchronous message bus, decoupling the API server from the heavy processing in the workers.
+5.  **Firestore:** Stores scan results, compliance reports, and audit logs.
+6.  **Gemini AI:** The reasoning engine used by the agents to analyze infrastructure and determine compliance.
+
+### Agent Workflow
+
+![Agent Workflow](agent_workflow.png)
+
+The compliance process is driven by a chain of specialized agents:
+
+*   **Resource Aggregator:** Discovers and ingests GCP assets.
+*   **CRA Modeler:** Applies the CRA compliance framework to the data.
+*   **Compliance Validator:** Validates the model against regulatory rules.
+*   **Reviewer:** Provides final approval and summary of the report.
+*   **Resource Tagger:** Tags resources with compliance status and remediation steps.
+
 ## 📂 Project Structure
 
 ```
@@ -38,34 +63,38 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   `gcloud` CLI installed and authenticated
 *   `terraform` installed
 *   Gemini API Key
+*   Docker & Docker Compose
 
-### Quick Start (Local)
+### Quick Start (Local Development)
 
-1.  **Set Environment Variables:**
+We provide a `Makefile` and `docker-compose` setup for easy local development with emulators.
+
+1.  **Configure Environment:**
     ```bash
-    export GEMINI_API_KEY="your_key"
-    export PROJECT_ID="your_project_id"
-    export GOOGLE_APPLICATION_CREDENTIALS="path/to/creds.json"
+    cp .env.example .env
+    # Edit .env and set your GEMINI_API_KEY and PROJECT_ID
     ```
 
-2.  **Run the Server:**
+2.  **Start Services:**
     ```bash
-    go run cmd/server/main.go
+    make start
     ```
+    This will spin up:
+    *   **Backend API:** http://localhost:8080
+    *   **Frontend:** http://localhost:3000
+    *   **Pub/Sub Emulator:** http://localhost:8085
+    *   **Firestore Emulator:** http://localhost:8081
 
-3.  **Run a Worker:**
-    ```bash
-    go run cmd/worker/main.go
-    ```
+3.  **Other Commands:**
+    *   `make build`: Compile all binaries.
+    *   `make test`: Run unit tests.
+    *   `make lint`: Run linters.
+    *   `make stop`: Stop all local services.
+    *   `make clean`: Cleanup artifacts.
 
-4.  **Trigger a Scan:**
-    ```bash
-    curl -X POST http://localhost:8080/api/scan -d '{"scope": "projects/my-project"}'
-    ```
+### Production Deployment (GKE/Cloud Run)
 
-### Deployment (GKE/Cloud Run)
-
-Use the provided `DEPLOY.sh` script to deploy the infrastructure and application.
+Use the provided `DEPLOY.sh` script to deploy the infrastructure and application to Google Cloud.
 
 ```bash
 # Deploy to Cloud Run (Serverless)
