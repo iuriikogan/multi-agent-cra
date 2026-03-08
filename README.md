@@ -1,71 +1,95 @@
-# Multi-Agent CRA System
+# Multi-Agent CRA Compliance System
 
-This project implements a Multi-Agent System (MAS) for EU Cyber Resilience Act (CRA) compliance using Go and Google's Gemini API.
+![Architecture Status](https://img.shields.io/badge/Architecture-Event--Driven-blue)
+![Go Version](https://img.shields.io/badge/Go-1.25-00ADD8)
+![AI Model](https://img.shields.io/badge/AI-Gemini%201.5%20Pro-8E75B2)
 
-## Architecture
+A scalable, event-driven multi-agent system designed to assess Google Cloud infrastructure against the EU Cyber Resilience Act (CRA).
 
-The system employs a sequential pipeline of specialized agents, orchestrated to assess cloud infrastructure compliance.
+## 🚀 Features
 
-```mermaid
-graph LR
-    A[Resource Aggregator] -->|Configuration| M[CRA Modeler]
-    M -->|Compliance Model| V[Compliance Validator]
-    V -->|Compliance Report| R[Reviewer]
-    R -->|Approval| T[Resource Tagger]
-    T -->|Tags| VR[Visual Reporter]
-    
-    subgraph "Parallel Processing"
-    A
-    M
-    V
-    R
-    T
-    end
+*   **Autonomous Agents:** Specialized AI agents for Discovery, Modeling, Validation, and Reporting.
+*   **Event-Driven:** Decoupled architecture using Google Cloud Pub/Sub.
+*   **Scalable:** Deploys on Google Kubernetes Engine (GKE) or Cloud Run.
+*   **AI-Powered:** Leverages Gemini 1.5 Pro for deep reasoning and compliance mapping.
+*   **Infrastructure as Code:** Full Terraform setup included.
+
+## 📂 Project Structure
+
+```
+├── cmd/
+│   ├── server/      # HTTP API Entrypoint
+│   ├── worker/      # Event-driven Worker Agents
+│   └── batch/       # Legacy CLI/Batch mode
+├── pkg/
+│   ├── agent/       # Gemini Agent implementation
+│   ├── core/        # Domain types
+│   ├── workflow/    # Orchestration logic
+│   └── tools/       # Agent tools (GCP API, etc.)
+├── terraform/       # Infrastructure definitions (GKE, PubSub, IAM)
+└── web/             # Frontend Dashboard (Next.js)
 ```
 
-### Agents
+## 🛠️ Setup & Deployment
 
-1.  **Resource Aggregator (Specialist)**
-    *   **Role:** Discovers and ingests asset configurations.
-    *   **Tools:** `list_gcp_assets`, `ingest_file_system`
-    *   **Model:** `gemini-3.1-flash-lite-preview`
+### Prerequisites
+*   Go 1.25+
+*   Google Cloud Project with Billing enabled
+*   `gcloud` CLI installed and authenticated
+*   `terraform` installed
+*   Gemini API Key
 
-2.  **CRA Modeler (Reasoning)**
-    *   **Role:** Maps technical configurations to CRA compliance requirements.
-    *   **Model:** `gemini-3-pro-preview`
+### Quick Start (Local)
 
-3.  **Compliance Validator (Checker)**
-    *   **Role:** Validates the model against specific regulations.
-    *   **Tools:** `read_cra_regulation_text`, `generate_conformity_doc`
-    *   **Model:** `gemini-3-pro-preview`
-
-4.  **Reviewer (Reasoning)**
-    *   **Role:** Provides final approval and summaries.
-    *   **Model:** `gemini-3-pro-preview`
-
-5.  **Resource Tagger (Specialist)**
-    *   **Role:** Generates remediation tags for non-compliant resources.
-    *   **Tools:** `apply_resource_tags`
-    *   **Model:** `gemini-3.1-flash-lite-preview`
-
-6.  **Visual Reporter (Specialist)**
-    *   **Role:** Generates visual dashboards of the compliance status.
-    *   **Tools:** `generate_visual_dashboard`
-    *   **Model:** `gemini-3-pro-preview` (invoking image generation)
-
-## Usage
-
-1.  Set your API Key: `export GEMINI_API_KEY=your_key`
-2.  Run the orchestrator:
+1.  **Set Environment Variables:**
     ```bash
-    go run cmd/main.go --project=my-gcp-project --log-level=INFO
+    export GEMINI_API_KEY="your_key"
+    export PROJECT_ID="your_project_id"
+    export GOOGLE_APPLICATION_CREDENTIALS="path/to/creds.json"
     ```
 
-### Flags
+2.  **Run the Server:**
+    ```bash
+    go run cmd/server/main.go
+    ```
 
-*   `--role`: (Optional) Run a specific agent role (server mode).
-*   `--mode`: Execution mode (`batch` or `server`). Default: `batch`.
-*   `--project`: Target GCP Project ID.
-*   `--folder`: Target GCP Folder ID.
-*   `--org`: Target GCP Organization ID.
-*   `--log-level`: Set logging verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`).
+3.  **Run a Worker:**
+    ```bash
+    go run cmd/worker/main.go
+    ```
+
+4.  **Trigger a Scan:**
+    ```bash
+    curl -X POST http://localhost:8080/api/scan -d '{"scope": "projects/my-project"}'
+    ```
+
+### Deployment (GKE/Cloud Run)
+
+Use the provided `DEPLOY.sh` script to deploy the infrastructure and application.
+
+```bash
+# Deploy to Cloud Run (Serverless)
+./DEPLOY.sh cloudrun
+
+# Deploy to GKE (Kubernetes)
+./DEPLOY.sh gke
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details on the system design.
+
+## 🧪 Testing
+
+Run unit tests:
+```bash
+go test ./...
+```
+
+Run security scans (requires Snyk):
+```bash
+snyk test
+snyk code test
+```
+
+## 📜 License
+
+Apache 2.0

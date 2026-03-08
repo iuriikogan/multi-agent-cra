@@ -26,3 +26,9 @@ variable "gemini_api_key" {
   type        = string
   sensitive   = true
 }
+
+variable "master_ipv4_cidr_block" {
+  description = "The IP range in CIDR notation to use for the hosted master network"
+  type        = string
+  default     = "172.16.0.0/28"
+}

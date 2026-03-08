@@ -21,9 +21,10 @@ resource "google_kms_key_ring" "key_ring" {
 
 # KMS Crypto Key
 resource "google_kms_crypto_key" "secret_key" {
-  name     = "gemini-api-key-encryption"
-  key_ring = google_kms_key_ring.key_ring.id
-  purpose  = "ENCRYPT_DECRYPT"
+  name            = "gemini-api-key-encryption"
+  key_ring        = google_kms_key_ring.key_ring.id
+  purpose         = "ENCRYPT_DECRYPT"
+  rotation_period = "7776000s" # 90 days
 }
 
 # Grant Secret Manager Service Agent access to the KMS key

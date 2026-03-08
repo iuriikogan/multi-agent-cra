@@ -1,7 +1,71 @@
-.tfstate
-.terraform
+# Terraform
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Sensitive variable files
+*.tfvars
+*.tfvars.json
+
+# Local override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI configuration
+.terraformrc
+terraform.rc
+
+# Project Specific
 .vscode
 .env
 .tessl
 tessl.json
-*.tfvars
+
+# Reports
+*_report.txt
+*.csv
+
+# Go
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# Root binaries (from cmd/...)
+batch
+server
+worker
+
+# Test and profiling
+*.test
+*.out
+*.prof
+vendor/
+
+# Node.js
+node_modules/
+dist/
+build/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js specific
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -2,7 +2,7 @@
 resource "google_compute_security_policy" "agent_armor" {
   name = "agent-armor-policy"
 
-  # Rule 1: Allow specific traffic (Placeholder for complex AI protection rules)
+  # Rule 1: Allow specific traffic
   rule {
     action   = "allow"
     priority = "1000"
@@ -15,7 +15,7 @@ resource "google_compute_security_policy" "agent_armor" {
     description = "Allow access"
   }
 
-  # Rule 2: SQL Injection Protection (Standard WAF)
+  # Rule 2: SQL Injection Protection
   rule {
     action   = "deny(403)"
     priority = "900"
@@ -27,7 +27,7 @@ resource "google_compute_security_policy" "agent_armor" {
     description = "Block SQL Injection"
   }
 
-  # Rule 3: Cross-Site Scripting Protection (Standard WAF)
+  # Rule 3: Cross-Site Scripting Protection
   rule {
     action   = "deny(403)"
     priority = "901"
@@ -37,5 +37,20 @@ resource "google_compute_security_policy" "agent_armor" {
       }
     }
     description = "Block XSS"
+  }
+
+  # Rule 4: Model Armor / LLM Protection (Placeholder)
+  # In a real Model Armor setup, this would reference specific AI protection rulesets
+  # typically available in Cloud Armor Enterprise.
+  # For now, we simulate this with a rule blocking known malicious prompts if signatures were available.
+  rule {
+    action   = "deny(403)"
+    priority = "800"
+    match {
+      expr {
+        expression = "evaluatePreconfiguredExpr('cve-canary')" # Placeholder for AI exploit rules
+      }
+    }
+    description = "Block AI Exploits (Model Armor)"
   }
 }
