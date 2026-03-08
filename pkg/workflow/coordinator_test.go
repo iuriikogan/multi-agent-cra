@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"multi-agent-cra/pkg/agent"
-	"multi-agent-cra/pkg/domain"
+	"multi-agent-cra/pkg/core"
 )
 
 // Ensure MockAgent implements the interface
@@ -69,15 +69,15 @@ func TestCoordinator_ProcessStream_Success(t *testing.T) {
 
 	coordinator := NewCoordinator(successAgent, successAgent, successAgent, successAgent, successAgent, 2)
 
-	inputChan := make(chan domain.Resource, 1)
-	inputChan <- domain.Resource{ID: "r1", Name: "Test Resource", Type: "Compute", ProjectID: "p1"}
+	inputChan := make(chan core.GCPResource, 1)
+	inputChan <- core.GCPResource{ID: "r1", Name: "Test Resource", Type: "Compute", ProjectID: "p1"}
 	close(inputChan)
 
 	ctx := context.Background()
 	resultsChan := coordinator.ProcessStream(ctx, inputChan)
 
 	// Collect results
-	var results []domain.AssessmentResult
+	var results []core.AssessmentResult
 	for res := range resultsChan {
 		results = append(results, res)
 	}
@@ -113,14 +113,14 @@ func TestCoordinator_ProcessStream_Failure(t *testing.T) {
 	// Aggregator fails, others succeed (but shouldn't be called for that item)
 	coordinator := NewCoordinator(failAgent, successAgent, successAgent, successAgent, successAgent, 1)
 
-	inputChan := make(chan domain.Resource, 1)
-	inputChan <- domain.Resource{ID: "r1", Name: "Fail Resource"}
+	inputChan := make(chan core.GCPResource, 1)
+	inputChan <- core.GCPResource{ID: "r1", Name: "Fail Resource"}
 	close(inputChan)
 
 	ctx := context.Background()
 	resultsChan := coordinator.ProcessStream(ctx, inputChan)
 
-	var results []domain.AssessmentResult
+	var results []core.AssessmentResult
 	for res := range resultsChan {
 		results = append(results, res)
 	}
@@ -152,9 +152,9 @@ func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
 	coordinator := NewCoordinator(slowAgent, slowAgent, slowAgent, slowAgent, slowAgent, 5)
 
 	count := 10
-	inputChan := make(chan domain.Resource, count)
+	inputChan := make(chan core.GCPResource, count)
 	for i := 0; i < count; i++ {
-		inputChan <- domain.Resource{ID: fmt.Sprintf("r%d", i), Name: "Resource"}
+		inputChan <- core.GCPResource{ID: fmt.Sprintf("r%d", i), Name: "Resource"}
 	}
 	close(inputChan)
 
@@ -162,7 +162,7 @@ func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
 	ctx := context.Background()
 	resultsChan := coordinator.ProcessStream(ctx, inputChan)
 
-	var results []domain.AssessmentResult
+	var results []core.AssessmentResult
 	for res := range resultsChan {
 		results = append(results, res)
 	}
@@ -180,7 +180,7 @@ func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].ResourceID < results[j].ResourceID
 	})
-	
+
 	for i, res := range results {
 		expectedID := fmt.Sprintf("r%d", i)
 		if res.ResourceID != expectedID {

@@ -8,121 +8,81 @@ import (
 	"time"
 
 	"multi-agent-cra/pkg/agent"
-	"multi-agent-cra/pkg/domain"
+	"multi-agent-cra/pkg/core"
 )
 
 // Coordinator acts as the Concurrency Agent, orchestrating the flow of data
-
 // between specialized agents using Go channels and goroutines.
-
 type Coordinator struct {
 	aggregator agent.Agent
-
-	modeler agent.Agent
-
-	validator agent.Agent
-
-	reviewer agent.Agent
-
-	tagger agent.Agent
-
+	modeler    agent.Agent
+	validator  agent.Agent
+	reviewer   agent.Agent
+	tagger     agent.Agent
 	concurrency int
 }
 
 // NewCoordinator initializes the workflow manager with specific agents.
-
 func NewCoordinator(aggregator, modeler, validator, reviewer, tagger agent.Agent, workers int) *Coordinator {
-
 	if workers <= 0 {
-
 		workers = 1
-
 	}
-
 	return &Coordinator{
-
-		aggregator: aggregator,
-
-		modeler: modeler,
-
-		validator: validator,
-
-		reviewer: reviewer,
-
-		tagger: tagger,
-
+		aggregator:  aggregator,
+		modeler:     modeler,
+		validator:   validator,
+		reviewer:    reviewer,
+		tagger:      tagger,
 		concurrency: workers,
 	}
-
 }
 
 // ProcessStream takes a stream of products and returns a stream of results.
 // It manages a worker pool to process items concurrently.
-func (c *Coordinator) ProcessStream(ctx context.Context, input <-chan domain.Resource) <-chan domain.AssessmentResult {
-
-	results := make(chan domain.AssessmentResult)
+func (c *Coordinator) ProcessStream(ctx context.Context, input <-chan core.GCPResource) <-chan core.AssessmentResult {
+	results := make(chan core.AssessmentResult)
 
 	go func() {
-
 		defer close(results)
-
 		var wg sync.WaitGroup
 
 		// Launch worker pool
 		for i := 0; i < c.concurrency; i++ {
-
 			wg.Add(1)
-
 			go func(workerID int) {
-
 				defer wg.Done()
-
 				c.workerLoop(ctx, workerID, input, results)
-
 			}(i)
-
 		}
-
 		wg.Wait()
-
 	}()
-
 	return results
-
 }
 
 // workerLoop consumes products and runs the agent pipeline for each.
-func (c *Coordinator) workerLoop(ctx context.Context, id int, input <-chan domain.Resource, output chan<- domain.AssessmentResult) {
+func (c *Coordinator) workerLoop(ctx context.Context, id int, input <-chan core.GCPResource, output chan<- core.AssessmentResult) {
 	slog.Debug("Worker started", "worker_id", id)
 	defer slog.Debug("Worker stopped", "worker_id", id)
 
 	for r := range input {
-
 		// Respect context cancellation
 		select {
-
 		case <-ctx.Done():
-
 			return
-
 		default:
-
 		}
 
 		res := c.analyzeResource(ctx, r)
-
 		output <- res
-
 	}
-
 }
 
 // analyzeResource executes the sequential logic for a single item:
 // Aggregator -> Modeler -> Validator -> Reviewer -> Tagger
-func (c *Coordinator) analyzeResource(ctx context.Context, r domain.Resource) domain.AssessmentResult {
+func (c *Coordinator) analyzeResource(ctx context.Context, r core.GCPResource) core.AssessmentResult {
 	slog.Info("Analyzing resource", "resource", r.Name, "type", r.Type)
 
-	res := domain.AssessmentResult{
+	res := core.AssessmentResult{
 		ResourceID:   r.ID,
 		ResourceName: r.Name,
 		ResourceType: r.Type,
