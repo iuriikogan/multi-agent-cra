@@ -1,5 +1,11 @@
 terraform {
   required_version = ">= 1.5"
+  
+  backend "gcs" {
+    prefix = "terraform/state"
+    # bucket value will be passed via -backend-config="bucket=..." during init
+  }
+
   required_providers {
     google = {
       source  = "hashicorp/google"

@@ -25,6 +25,13 @@ resource "kubernetes_network_policy" "allow_dns" {
         protocol = "TCP"
         port     = 53
       }
+      to {
+        namespace_selector {
+          match_labels = {
+            "kubernetes.io/metadata.name" = "kube-system"
+          }
+        }
+      }
     }
     policy_types = ["Egress"]
   }

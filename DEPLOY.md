@@ -1,153 +1,76 @@
 # Deployment Instructions
 
-This document provides detailed instructions for deploying the Multi-Agent CRA System locally, to Google Kubernetes Engine (GKE) using Terraform, and to Cloud Run using the provided shell script.
+This document provides detailed instructions for deploying the Multi-Agent CRA System to Google Cloud Run using the unified `build.sh` script.
 
-## 1. Local Deployment
+## 1. Local Deployment (Development)
 
-Run the application locally for development and testing.
+Run the application locally for development and testing using Docker Compose.
 
-### Prerequisites
-*   **Go**: Version 1.25 or higher ([Download](https://go.dev/dl/)).
-*   **Google Gemini API Key**: A valid API Key.
-
-### Steps
-1.  **Clone the repository** (if not already done):
+1.  **Configure Environment:**
+    Copy `.env.example` to `.env` and fill in your values (specifically `GEMINI_API_KEY`).
     ```bash
-    git clone <repository-url>
-    cd multi-agent-cra
+    cp .env.example .env
     ```
 
-2.  **Set Environment Variables**:
+2.  **Start Services:**
     ```bash
-    # Linux/macOS
-    export GEMINI_API_KEY="your_actual_api_key_here"
+    make start
+    ```
+    This will build the frontend, embed it into the server, and start the Server, Worker, and Emulators.
+    *   **Dashboard:** http://localhost:8080
 
-    # Windows (PowerShell)
-    $env:GEMINI_API_KEY="your_actual_api_key_here"
+3.  **Stop Services:**
+    ```bash
+    make stop
     ```
 
-3.  **Run the Application**:
-    ```bash
-    go run cmd/main.go
-    ```
-    *Note: The current local execution runs all agents within a single process via the coordinator.*
+## 2. Production Deployment (Cloud Run)
 
----
-
-## 2. Google Kubernetes Engine (GKE) Deployment
-
-This method uses **Terraform** to provision a GKE Autopilot cluster, secure secrets, and deploy the agents as separate Kubernetes workloads.
+The system deploys as two simplified Cloud Run services:
+1.  **cra-server**: Houses the API and the React Frontend (static export).
+2.  **cra-worker**: Handles the background AI agent tasks.
 
 ### Prerequisites
 *   **Google Cloud Project**: With billing enabled.
-*   **Terraform**: Installed.
-*   **gcloud CLI**: Installed and authenticated (`gcloud auth login`, `gcloud auth application-default login`).
-*   **Docker**: For building the image.
+*   **APIs Enabled**: `run.googleapis.com`, `cloudbuild.googleapis.com`, `artifactregistry.googleapis.com`, `secretmanager.googleapis.com`.
+*   **Permissions**: You need Owner or Editor role on the project to run the setup script initially.
 
-### Step 1: Build and Push Docker Image
-Before running Terraform, the container image must exist in a registry (e.g., Google Artifact Registry or Container Registry).
-
-1.  **Set Variables**:
-    ```bash
-    export PROJECT_ID="your-project-id"
-    export IMAGE_NAME="gcr.io/${PROJECT_ID}/agent-cra:latest"
-    ```
-
-2.  **Build and Push**:
-    ```bash
-    # Enable Container Registry API if needed, or use Artifact Registry
-    gcloud services enable containerregistry.googleapis.com
-
-    # Build
-    docker build -t $IMAGE_NAME .
-
-    # Configure Docker to push to GCR
-    gcloud auth configure-docker
-
-    # Push
-    docker push $IMAGE_NAME
-    ```
-
-### Step 2: Deploy Infrastructure with Terraform
-1.  **Navigate to the Terraform directory**:
-    ```bash
-    cd terraform
-    ```
-
-2.  **Create a `terraform.tfvars` file**:
-    Create a file named `terraform.tfvars` with your specific configuration. **Do not commit this file.**
-    ```hcl
-    project_id       = "your-project-id"
-    region           = "us-central1"
-    cluster_name     = "agent-engine-cluster"
-    image_repository = "gcr.io/your-project-id/agent-cra:latest" # Must match the image pushed in Step 1
-    gemini_api_key   = "your-actual-gemini-api-key"
-    ```
-
-3.  **Initialize and Apply**:
-    ```bash
-    terraform init
-    terraform apply
-    ```
-    *Confirm the action by typing `yes` when prompted.*
-
-    **What this does:**
-    *   Creates a VPC Network and Subnet.
-    *   Provisions a GKE Autopilot Cluster.
-    *   Creates a Secret in Google Secret Manager for the API Key.
-    *   Sets up Workload Identity (IAM binding between K8s Service Accounts and Google Service Accounts).
-    *   Deploys 4 microservices (`agent-classifier`, `agent-auditor`, `agent-vuln`, `agent-reporter`).
-
-### Step 3: Verify Deployment
-1.  **Get Cluster Credentials**:
-    ```bash
-    gcloud container clusters get-credentials agent-engine-cluster --region us-central1
-    ```
-
-2.  **Check Pods**:
-    ```bash
-    kubectl get pods
-    ```
-    You should see pods for each agent (classifier, auditor, vuln, reporter) running.
-
----
-
-## 3. Cloud Run Deployment
-
-This method uses the `deploy.sh` script to deploy the agents as serverless Cloud Run services.
-
-### Prerequisites
-*   **Google Cloud SDK**: `gcloud` installed and authenticated.
-*   **Project ID**: Set your active project (`gcloud config set project YOUR_PROJECT_ID`).
-
-### Step 1: Create the API Key Secret
-The deployment script expects a secret named `gemini-api-key` to exist in Secret Manager.
+### Step 1: Run the Build Script
+The `build.sh` script automates the entire process:
+*   Enables APIs.
+*   Creates Artifact Registry.
+*   Creates/Updates the `GEMINI_API_KEY` secret.
+*   Sets up Pub/Sub topics.
+*   Fixes IAM permissions for Cloud Build.
+*   Triggers the build and deployment.
 
 ```bash
-# Replace YOUR_API_KEY with your actual key
-echo -n "YOUR_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
+./build.sh
 ```
 
-### Step 2: Run the Deployment Script
-1.  **Make the script executable**:
-    ```bash
-    chmod +x deploy.sh
-    ```
+### Step 2: Access the Application
+Once the script completes, it will output the URL for `cra-server`.
+Example: `https://cra-server-578241461072.us-central1.run.app`
 
-2.  **Run the script**:
-    ```bash
-    ./deploy.sh
-    ```
+Open this URL in your browser to access the Dashboard.
 
-    **What this script does:**
-    *   Enables necessary Google Cloud APIs.
-    *   Creates a dedicated Service Account.
-    *   Creates an Artifact Registry repository.
-    *   Builds the Docker image using Cloud Build (no local Docker required).
-    *   Deploys 4 Cloud Run services, injecting the API Key secret and setting the `AGENT_ROLE` environment variable.
+### Step 3: Security (Cloud Armor)
 
-### Step 3: Verify
-The script will output the URLs of the deployed services. You can also list them:
-```bash
-gcloud run services list
-```
+**Crucial Step:** After deployment, configure **Google Cloud Armor** to protect your public endpoint.
+
+1.  **Go to Console**: Navigate to **Network Security** > **Cloud Armor**.
+2.  **Create Policy**: Create a policy named `agent-armor-policy`.
+3.  **Configure Rules**:
+    *   Enable **Model Armor** to filter malicious LLM prompts.
+    *   Enable **Adaptive Protection** for DDoS mitigation.
+    *   (Optional) Restrict access to your corporate IP range or VPN if required.
+4.  **Attach Policy**:
+    *   Go to **Cloud Run** > **cra-server** > **Integrations** (or Security).
+    *   Attach the Cloud Armor policy/load balancer configuration.
+
+## 3. Architecture Notes
+
+*   **Frontend**: Built as a static site (`next build` with `output: export`) and embedded into the Go binary (`//go:embed`). This allows a single container to serve the UI and API.
+*   **Scaling**: 
+    *   `cra-server`: Auto-scales based on HTTP traffic.
+    *   `cra-worker`: Auto-scales based on CPU/Memory usage (or custom Pub/Sub metrics if configured). Can scale to 0 to save costs.

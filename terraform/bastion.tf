@@ -4,6 +4,12 @@ resource "google_compute_subnetwork" "bastion_subnet" {
   region        = var.region
   network       = google_compute_network.vpc.name
   ip_cidr_range = "10.10.0.0/28"
+
+  log_config {
+    aggregation_interval = "INTERVAL_10_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
 }
 
 # Cloud NAT (Required for Private Cluster nodes and Bastion to access internet)
@@ -67,5 +73,14 @@ resource "google_compute_instance" "bastion" {
 
   metadata = {
     enable-oslogin = "TRUE"
+    block-project-ssh-keys = "TRUE"
+  }
+
+  deletion_protection = true
+
+  shielded_instance_config {
+    enable_secure_boot          = true
+    enable_vtpm                 = true
+    enable_integrity_monitoring = true
   }
 }

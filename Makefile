@@ -11,6 +11,7 @@ GO_LINT=golangci-lint run
 CMD_DIR=./cmd
 BIN_DIR=./bin
 WEB_DIR=./web
+SERVER_OUT_DIR=$(CMD_DIR)/server/out
 
 # Binaries
 SERVER_BIN=$(BIN_DIR)/server
@@ -23,11 +24,16 @@ all: build
 
 # --- Build Commands ---
 
-build: build-server build-worker build-batch build-web
+build: build-web build-server build-worker build-batch
 
-build-server:
-	@echo "Building Server..."
+# Server depends on Web because of embedded assets
+build-server: build-web
+	@echo "Building Server (with embedded frontend)..."
 	@mkdir -p $(BIN_DIR)
+	# Ensure the output directory exists for the embed directive
+	@mkdir -p $(SERVER_OUT_DIR)
+	# Copy the static assets to the embed location
+	@cp -r $(WEB_DIR)/out/* $(SERVER_OUT_DIR)/
 	$(GO_BUILD) -o $(SERVER_BIN) $(CMD_DIR)/server/main.go
 
 build-worker:
@@ -87,6 +93,7 @@ clean:
 	rm -rf $(BIN_DIR)
 	rm -rf $(WEB_DIR)/.next
 	rm -rf $(WEB_DIR)/out
+	rm -rf $(SERVER_OUT_DIR)
 	@echo "Cleaning Docker resources (optional)..."
 	# docker-compose down -v --rmi local
 

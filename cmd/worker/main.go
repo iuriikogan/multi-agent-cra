@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -26,6 +27,31 @@ func main() {
 	logger.Setup(cfg.LogLevel)
 
 	ctx := context.Background()
+
+	// --- Cloud Run Health Check Requirement ---
+	// Start a dummy HTTP server to satisfy Cloud Run's container startup probe.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "Worker is running")
+		})
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "OK")
+		})
+		
+		slog.Info("Starting health check server", "port", port)
+		if err := http.ListenAndServe(":"+port, mux); err != nil {
+			slog.Error("Health check server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+	// ------------------------------------------
 
 	// Initialize Pub/Sub Client
 	pubsubClient, err := queue.NewClient(ctx, cfg.ProjectID)

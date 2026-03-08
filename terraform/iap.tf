@@ -1,3 +1,10 @@
+# Enable IAP API
+resource "google_project_service" "iap" {
+  project            = var.project_id
+  service            = "iap.googleapis.com"
+  disable_on_destroy = false
+}
+
 # IAP Brand and Client (Requires existing Organization configuration usually)
 # For this demo, we assume the Brand might exist or we try to create it.
 # Note: google_iap_brand creation often fails if one already exists for the project.
@@ -6,6 +13,7 @@ resource "google_iap_brand" "project_brand" {
   support_email     = "support@${var.project_id}.iam.gserviceaccount.com"
   application_title = "Agent CRA Internal"
   project           = var.project_id
+  depends_on        = [google_project_service.iap]
 }
 
 resource "google_iap_client" "gke_client" {

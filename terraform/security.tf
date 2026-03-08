@@ -51,6 +51,20 @@ resource "google_compute_security_policy" "agent_armor" {
         expression = "evaluatePreconfiguredExpr('cve-canary')" # Placeholder for AI exploit rules
       }
     }
-    description = "Block AI Exploits (Model Armor)"
-  }
-}
+        description = "Block AI Exploits (Model Armor)"
+      }
+    
+      # Default Rule (Required)
+      rule {
+        action   = "deny(403)"
+        priority = "2147483647"
+        match {
+          versioned_expr = "SRC_IPS_V1"
+          config {
+            src_ip_ranges = ["*"]
+          }
+        }
+        description = "Default deny all"
+      }
+    }
+    

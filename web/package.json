@@ -26,5 +26,10 @@
     "eslint": "8.45.0",
     "eslint-config-next": "13.4.12",
     "typescript": "5.1.6"
+  },
+  "overrides": {
+    "zod": "^3.22.3",
+    "postcss": "^8.4.31",
+    "file-entry-cache": "^8.0.0"
   }
 }

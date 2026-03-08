@@ -44,6 +44,11 @@ The system is designed as an event-driven, microservices-based application runni
     *   `gemini-3.1-flash-lite-preview`: Used for high-volume, low-latency tasks (Aggregator, Tagger).
     *   `gemini-3-pro-preview`: Used for complex reasoning and validation (Modeler, Validator, Reviewer).
 
+### 6. Security (Cloud Armor)
+*   **WAF & DDoS Protection:** Google Cloud Armor protects the public endpoints.
+*   **Model Armor:** Specific AI/LLM protection rules (e.g., prompt injection, jailbreak detection) are applied to the ingress traffic.
+*   **Management:** Security policies are managed via the Google Cloud Console to leverage Adaptive Protection and fine-grained rule tuning.
+
 ## Data Flow
 
 1.  **User** submits a scan request for a Project/Folder via the API.
@@ -56,7 +61,7 @@ The system is designed as an event-driven, microservices-based application runni
 ## Infrastructure as Code (Terraform)
 
 The `terraform/` directory contains the definition for:
-*   GKE Cluster (Autopilot) / Cloud Run Services.
+*   GKE Cluster (Autopilot)
 *   Pub/Sub Topics and Subscriptions.
 *   IAM Service Accounts and Bindings.
 *   VPC Network and Security configurations.

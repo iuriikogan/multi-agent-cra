@@ -2,42 +2,24 @@
 # 1. Kubernetes Service Accounts (KSAs)
 # ------------------------------------------------------------------------------
 
-resource "kubernetes_service_account_v1" "ksa_classifier" {
+resource "kubernetes_service_account_v1" "ksa_cra_server" {
   metadata {
-    name      = "ksa-classifier"
+    name      = "ksa-cra-server"
     namespace = "default"
     annotations = {
+      # Use the server SA identity (or reusing classifier/general identity for now)
       "iam.gke.io/gcp-service-account" = google_service_account.sa_classifier.email
     }
   }
 }
 
-resource "kubernetes_service_account_v1" "ksa_auditor" {
+resource "kubernetes_service_account_v1" "ksa_cra_worker" {
   metadata {
-    name      = "ksa-auditor"
+    name      = "ksa-cra-worker"
     namespace = "default"
     annotations = {
+      # Use the worker SA identity (reusing auditor for now or create new dedicated one)
       "iam.gke.io/gcp-service-account" = google_service_account.sa_auditor.email
-    }
-  }
-}
-
-resource "kubernetes_service_account_v1" "ksa_vuln" {
-  metadata {
-    name      = "ksa-vuln"
-    namespace = "default"
-    annotations = {
-      "iam.gke.io/gcp-service-account" = google_service_account.sa_vuln.email
-    }
-  }
-}
-
-resource "kubernetes_service_account_v1" "ksa_reporter" {
-  metadata {
-    name      = "ksa-reporter"
-    namespace = "default"
-    annotations = {
-      "iam.gke.io/gcp-service-account" = google_service_account.sa_reporter.email
     }
   }
 }
@@ -74,19 +56,19 @@ resource "kubectl_manifest" "secret_provider_class" {
 }
 
 # ------------------------------------------------------------------------------
-# 3. Deployments (Micro-Agent Architecture)
+# 3. Deployments
 # ------------------------------------------------------------------------------
 
-# --- Scope Classifier ---
-resource "kubernetes_deployment_v1" "agent_classifier" {
-  metadata { name = "agent-classifier" }
+# --- Unified CRA Server (API + Frontend) ---
+resource "kubernetes_deployment_v1" "cra_server" {
+  metadata { name = "cra-server" }
   spec {
-    replicas = 1
-    selector { match_labels = { app = "agent-classifier" } }
+    replicas = 2
+    selector { match_labels = { app = "cra-server" } }
     template {
-      metadata { labels = { app = "agent-classifier" } }
+      metadata { labels = { app = "cra-server" } }
       spec {
-        service_account_name = kubernetes_service_account_v1.ksa_classifier.metadata[0].name
+        service_account_name = kubernetes_service_account_v1.ksa_cra_server.metadata[0].name
         volume {
           name = "secrets-store-inline"
           csi {
@@ -96,12 +78,11 @@ resource "kubernetes_deployment_v1" "agent_classifier" {
           }
         }
         container {
-          image = var.image_repository
-          name  = "classifier"
-          # Hypothetical entrypoint command
-          command = ["/app/main"]
-          args    = ["--role=classifier", "--mode=server"]
-
+          image = "${var.region}-docker.pkg.dev/${var.project_id}/multi-agent-cra/server:latest"
+          name  = "server"
+          
+          # No args needed, defaults to serving API + Static
+          
           volume_mount {
             name       = "secrets-store-inline"
             mount_path = "/mnt/secrets-store"
@@ -120,17 +101,21 @@ resource "kubernetes_deployment_v1" "agent_classifier" {
             name  = "PROJECT_ID"
             value = var.project_id
           }
+          env {
+            name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
+            value = "scan-requests"
+          }
 
           port { container_port = 8080 }
 
           resources {
             limits = {
-              cpu    = "500m"
-              memory = "512Mi"
+              cpu    = "1000m"
+              memory = "1Gi"
             }
             requests = {
-              cpu    = "250m"
-              memory = "256Mi"
+              cpu    = "500m"
+              memory = "512Mi"
             }
           }
           security_context {
@@ -142,11 +127,11 @@ resource "kubernetes_deployment_v1" "agent_classifier" {
           }
           liveness_probe {
             http_get {
-              path = "/healthz"
+              path = "/api/healthz"
               port = 8080
             }
-            initial_delay_seconds = 3
-            period_seconds        = 3
+            initial_delay_seconds = 5
+            period_seconds        = 10
           }
           image_pull_policy = "Always"
         }
@@ -155,16 +140,16 @@ resource "kubernetes_deployment_v1" "agent_classifier" {
   }
 }
 
-# --- Regulatory Auditor ---
-resource "kubernetes_deployment_v1" "agent_auditor" {
-  metadata { name = "agent-auditor" }
+# --- CRA Worker (Agents) ---
+resource "kubernetes_deployment_v1" "cra_worker" {
+  metadata { name = "cra-worker" }
   spec {
     replicas = 1
-    selector { match_labels = { app = "agent-auditor" } }
+    selector { match_labels = { app = "cra-worker" } }
     template {
-      metadata { labels = { app = "agent-auditor" } }
+      metadata { labels = { app = "cra-worker" } }
       spec {
-        service_account_name = kubernetes_service_account_v1.ksa_auditor.metadata[0].name
+        service_account_name = kubernetes_service_account_v1.ksa_cra_worker.metadata[0].name
         volume {
           name = "secrets-store-inline"
           csi {
@@ -174,10 +159,8 @@ resource "kubernetes_deployment_v1" "agent_auditor" {
           }
         }
         container {
-          image   = var.image_repository
-          name    = "auditor"
-          command = ["/app/main"]
-          args    = ["--role=auditor", "--mode=server"]
+          image = "${var.region}-docker.pkg.dev/${var.project_id}/multi-agent-cra/worker:latest"
+          name  = "worker"
 
           volume_mount {
             name       = "secrets-store-inline"
@@ -197,16 +180,25 @@ resource "kubernetes_deployment_v1" "agent_auditor" {
             name  = "PROJECT_ID"
             value = var.project_id
           }
-          port { container_port = 8080 }
+          env {
+            name  = "PUBSUB_SUB_SCAN_REQUESTS"
+            value = "scan-requests-sub"
+          }
+          env {
+            name  = "PORT"
+            value = "8080"
+          }
+
+          port { container_port = 8080 } # For health check
 
           resources {
             limits = {
-              cpu    = "500m"
-              memory = "512Mi"
+              cpu    = "1000m"
+              memory = "2Gi"
             }
             requests = {
-              cpu    = "250m"
-              memory = "256Mi"
+              cpu    = "500m"
+              memory = "1Gi"
             }
           }
           security_context {
@@ -221,162 +213,8 @@ resource "kubernetes_deployment_v1" "agent_auditor" {
               path = "/healthz"
               port = 8080
             }
-            initial_delay_seconds = 3
-            period_seconds        = 3
-          }
-          image_pull_policy = "Always"
-        }
-      }
-    }
-  }
-}
-
-# --- Vulnerability Watchdog ---
-resource "kubernetes_deployment_v1" "agent_vuln" {
-  metadata { name = "agent-vuln" }
-  spec {
-    replicas = 1
-    selector { match_labels = { app = "agent-vuln" } }
-    template {
-      metadata { labels = { app = "agent-vuln" } }
-      spec {
-        service_account_name = kubernetes_service_account_v1.ksa_vuln.metadata[0].name
-        volume {
-          name = "secrets-store-inline"
-          csi {
-            driver            = "secrets-store.csi.k8s.io"
-            read_only         = true
-            volume_attributes = { secretProviderClass = "gemini-api-key-spc" }
-          }
-        }
-        container {
-          image   = var.image_repository
-          name    = "vuln"
-          command = ["/app/main"]
-          args    = ["--role=vuln", "--mode=server"]
-
-          volume_mount {
-            name       = "secrets-store-inline"
-            mount_path = "/mnt/secrets-store"
-            read_only  = true
-          }
-          env {
-            name = "GEMINI_API_KEY"
-            value_from {
-              secret_key_ref {
-                name = "gemini-api-key"
-                key  = "key"
-              }
-            }
-          }
-          env {
-            name  = "PROJECT_ID"
-            value = var.project_id
-          }
-
-          port { container_port = 8080 }
-
-          resources {
-            limits = {
-              cpu    = "500m"
-              memory = "512Mi"
-            }
-            requests = {
-              cpu    = "250m"
-              memory = "256Mi"
-            }
-          }
-          security_context {
-            run_as_non_root            = true
-            allow_privilege_escalation = false
-            capabilities {
-              drop = ["ALL"]
-            }
-          }
-          liveness_probe {
-            http_get {
-              path = "/healthz"
-              port = 8080
-            }
-            initial_delay_seconds = 3
-            period_seconds        = 3
-          }
-          image_pull_policy = "Always"
-        }
-      }
-    }
-  }
-}
-
-# --- Compliance Reporter ---
-resource "kubernetes_deployment_v1" "agent_reporter" {
-  metadata { name = "agent-reporter" }
-  spec {
-    replicas = 1
-    selector { match_labels = { app = "agent-reporter" } }
-    template {
-      metadata { labels = { app = "agent-reporter" } }
-      spec {
-        service_account_name = kubernetes_service_account_v1.ksa_reporter.metadata[0].name
-        volume {
-          name = "secrets-store-inline"
-          csi {
-            driver            = "secrets-store.csi.k8s.io"
-            read_only         = true
-            volume_attributes = { secretProviderClass = "gemini-api-key-spc" }
-          }
-        }
-        container {
-          image   = var.image_repository
-          name    = "reporter"
-          command = ["/app/main"]
-          args    = ["--role=reporter", "--mode=server"]
-
-          volume_mount {
-            name       = "secrets-store-inline"
-            mount_path = "/mnt/secrets-store"
-            read_only  = true
-          }
-          env {
-            name = "GEMINI_API_KEY"
-            value_from {
-              secret_key_ref {
-                name = "gemini-api-key"
-                key  = "key"
-              }
-            }
-          }
-          env {
-            name  = "PROJECT_ID"
-            value = var.project_id
-          }
-
-          port { container_port = 8080 }
-
-          resources {
-            limits = {
-              cpu    = "500m"
-              memory = "512Mi"
-            }
-            requests = {
-              cpu    = "250m"
-              memory = "256Mi"
-            }
-          }
-          security_context {
-            run_as_non_root            = true
-            allow_privilege_escalation = false
-            capabilities {
-              drop = ["ALL"]
-            }
-          }
-          liveness_probe {
-            http_get {
-              path = "/healthz"
-              port = 8080
-            }
-            initial_delay_seconds = 3
-            period_seconds        = 3
+            initial_delay_seconds = 5
+            period_seconds        = 10
           }
           image_pull_policy = "Always"
         }
@@ -386,48 +224,13 @@ resource "kubernetes_deployment_v1" "agent_reporter" {
 }
 
 # ------------------------------------------------------------------------------
-# 4. Services (Internal Communication)
+# 4. Services
 # ------------------------------------------------------------------------------
 
-resource "kubernetes_service_v1" "svc_classifier" {
-  metadata { name = "svc-classifier" }
+resource "kubernetes_service_v1" "svc_server" {
+  metadata { name = "agent-cra-service" } # Matching the name expected by Gateway
   spec {
-    selector = { app = "agent-classifier" }
-    port {
-      port        = 80
-      target_port = 8080
-    }
-    type = "ClusterIP"
-  }
-}
-
-resource "kubernetes_service_v1" "svc_auditor" {
-  metadata { name = "svc-auditor" }
-  spec {
-    selector = { app = "agent-auditor" }
-    port {
-      port        = 80
-      target_port = 8080
-    }
-    type = "ClusterIP"
-  }
-}
-
-resource "kubernetes_service_v1" "svc_vuln" {
-  metadata { name = "svc-vuln" }
-  spec {
-    port {
-      port        = 80
-      target_port = 8080
-    }
-    type = "ClusterIP"
-  }
-}
-
-resource "kubernetes_service_v1" "svc_reporter" {
-  metadata { name = "svc-reporter" }
-  spec {
-    selector = { app = "agent-reporter" }
+    selector = { app = "cra-server" }
     port {
       port        = 80
       target_port = 8080

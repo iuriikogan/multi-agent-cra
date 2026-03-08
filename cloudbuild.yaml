@@ -1,0 +1,42 @@
+steps:
+  # 1. Build Unified Server Image (Frontend + Backend + Worker)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Server'
+    args: ['build', '--build-arg', 'TARGET=server', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}', '.']
+  
+  # 2. Push Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Server'
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}']
+
+  # 3. Deploy Unified Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Server'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cra-server'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
+      - '--region'
+      - '${_REGION}'
+      - '--set-env-vars'
+      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID}'
+      - '--set-env-vars'
+      - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
+      - '--set-secrets'
+      - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
+      - '--allow-unauthenticated'
+      # Force CPU allocation even when idle so background worker (subscriber) keeps running
+      - '--no-cpu-throttling' 
+      - '--min-instances'
+      - '1'
+
+substitutions:
+  _REGION: us-central1
+  _REPO_NAME: multi-agent-cra
+  _TAG: latest
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'

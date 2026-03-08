@@ -1,18 +1,17 @@
-# Multi-Agent CRA Compliance System
+# Multi-Agent CRA Security Platform
 
-![Architecture Status](https://img.shields.io/badge/Architecture-Event--Driven-blue)
-![Go Version](https://img.shields.io/badge/Go-1.25-00ADD8)
-![AI Model](https://img.shields.io/badge/AI-Gemini%201.5%20Pro-8E75B2)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A scalable, event-driven multi-agent system designed to assess Google Cloud infrastructure against the EU Cyber Resilience Act (CRA).
+A scalable, event-driven multi-agent system designed to assess Google Cloud infrastructure against the **Cyber Resilience Act (CRA)**.
 
 ## 🚀 Features
 
 *   **Autonomous Agents:** Specialized AI agents for Discovery, Modeling, Validation, and Reporting.
 *   **Event-Driven:** Decoupled architecture using Google Cloud Pub/Sub.
-*   **Scalable:** Deploys on Google Kubernetes Engine (GKE) or Cloud Run.
+*   **Unified Deployment:** Backend API and Frontend Dashboard served from a single, scalable Cloud Run service.
 *   **AI-Powered:** Leverages Gemini 1.5 Pro for deep reasoning and compliance mapping.
 *   **Infrastructure as Code:** Full Terraform setup included.
+*   **Security:** Google Cloud Armor ready (Model Armor for AI protection).
 
 ## 🏗️ System Architecture
 
@@ -20,12 +19,14 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 
 The system is composed of the following key components:
 
-1.  **Frontend (Next.js):** A responsive web dashboard for triggering scans, viewing results, and managing compliance reports.
-2.  **Backend API (Go):** A RESTful API server that handles user requests, initiates scans via Pub/Sub, and queries Firestore for data.
-3.  **Worker (Go):** An autonomous worker service that consumes scan requests from Pub/Sub, orchestrates the AI agents, and performs the actual compliance assessments.
-4.  **Pub/Sub:** Acts as the asynchronous message bus, decoupling the API server from the heavy processing in the workers.
-5.  **Firestore:** Stores scan results, compliance reports, and audit logs.
-6.  **Gemini AI:** The reasoning engine used by the agents to analyze infrastructure and determine compliance.
+1.  **Unified Server (Go):** 
+    *   Hosts the **REST API** for triggering scans.
+    *   Serves the **React/Next.js Dashboard** (static export) directly.
+    *   Handles authentication and audit logging.
+2.  **Worker (Go):** An autonomous worker service that consumes scan requests from Pub/Sub, orchestrates the AI agents, and performs the actual compliance assessments.
+3.  **Pub/Sub:** Acts as the asynchronous message bus, decoupling the API server from the heavy processing in the workers.
+4.  **Firestore:** Stores scan results, compliance reports, and audit logs.
+5.  **Gemini AI:** The reasoning engine used by the agents to analyze infrastructure and determine compliance.
 
 ### Agent Workflow
 
@@ -43,22 +44,18 @@ The compliance process is driven by a chain of specialized agents:
 
 ```
 ├── cmd/
-│   ├── server/      # HTTP API Entrypoint
-│   ├── worker/      # Event-driven Worker Agents
-│   └── batch/       # Legacy CLI/Batch mode
-├── pkg/
-│   ├── agent/       # Gemini Agent implementation
-│   ├── core/        # Domain types
-│   ├── workflow/    # Orchestration logic
-│   └── tools/       # Agent tools (GCP API, etc.)
-├── terraform/       # Infrastructure definitions (GKE, PubSub, IAM)
-└── web/             # Frontend Dashboard (Next.js)
+│   ├── server/      # API Server + Static File Server
+│   └── worker/      # Agent Orchestration Worker
+├── pkg/             # Shared libraries (Agents, Core, Config)
+├── web/             # Next.js Frontend Dashboard
+├── terraform/       # IaC definitions
+└── cloudbuild.yaml  # CI/CD Pipeline
 ```
 
-## 🛠️ Setup & Deployment
+## 🛠️ Prerequisites
 
-### Prerequisites
 *   Go 1.25+
+*   Node.js 20+ (for frontend build)
 *   Google Cloud Project with Billing enabled
 *   `gcloud` CLI installed and authenticated
 *   `terraform` installed
@@ -67,7 +64,7 @@ The compliance process is driven by a chain of specialized agents:
 
 ### Quick Start (Local Development)
 
-We provide a `Makefile` and `docker-compose` setup for easy local development with emulators.
+We provide a `Makefile` and `docker-compose` setup for easy local development.
 
 1.  **Configure Environment:**
     ```bash
@@ -80,45 +77,43 @@ We provide a `Makefile` and `docker-compose` setup for easy local development wi
     make start
     ```
     This will spin up:
-    *   **Backend API:** http://localhost:8080
-    *   **Frontend:** http://localhost:3000
+    *   **Dashboard & API:** http://localhost:8080
     *   **Pub/Sub Emulator:** http://localhost:8085
     *   **Firestore Emulator:** http://localhost:8081
 
-3.  **Other Commands:**
-    *   `make build`: Compile all binaries.
-    *   `make test`: Run unit tests.
-    *   `make lint`: Run linters.
-    *   `make stop`: Stop all local services.
-    *   `make clean`: Cleanup artifacts.
+3.  **Trigger a Scan:**
+    Go to the dashboard or use cURL:
+    ```bash
+    curl -X POST http://localhost:8080/api/scan -d '{"scope": "projects/my-project"}'
+    ```
 
-### Production Deployment (GKE/Cloud Run)
+### Production Deployment (Cloud Run)
 
-Use the provided `DEPLOY.sh` script to deploy the infrastructure and application to Google Cloud.
+Use the provided build script to deploy the entire stack to Google Cloud Run. This handles the multi-stage build (Frontend -> Embedded -> Server Container) automatically.
 
 ```bash
-# Deploy to Cloud Run (Serverless)
-./DEPLOY.sh cloudrun
-
-# Deploy to GKE (Kubernetes)
-./DEPLOY.sh gke
+./build.sh
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details on the system design.
+**What happens:**
+1.  Frontend is built (`npm run build`).
+2.  Go Server is built with embedded frontend assets.
+3.  Worker image is built.
+4.  Both services (`cra-server`, `cra-worker`) are deployed to Cloud Run.
+
+### Post-Deployment: Security Configuration
+
+The system uses **Google Cloud Armor** with **Model Armor** to protect the AI agents. This must be configured manually in the Google Cloud Console to allow for fine-tuning.
+
+1.  Navigate to **Network Security** > **Cloud Armor**.
+2.  Create a new policy named `agent-armor-policy`.
+3.  Enable **Model Armor** (AI/LLM Protection) rules to block prompt injection and other attacks.
+4.  Attach this policy to the `cra-server` service.
+
+See [SECURITY.md](SECURITY.md) for detailed instructions.
 
 ## 🧪 Testing
 
-Run unit tests:
 ```bash
-go test ./...
+make test
 ```
-
-Run security scans (requires Snyk):
-```bash
-snyk test
-snyk code test
-```
-
-## 📜 License
-
-Apache 2.0

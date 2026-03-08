@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Go
+bin/
+vendor/
+*.exe
+*.test
+*.out
+
+# Node.js
+node_modules/
+web/node_modules/
+.next/
+web/.next/
+out/
+web/out/
+build/
+dist/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# IDEs
+.vscode/
+.idea/
+
+# Local env
+.env
+.env.local
+
+# Logs
+*.log
+
+# Temp
+tmp/

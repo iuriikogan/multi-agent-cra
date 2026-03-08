@@ -42,10 +42,6 @@ bin/
 *.dll
 *.so
 *.dylib
-# Root binaries (from cmd/...)
-batch
-server
-worker
 
 # Test and profiling
 *.test

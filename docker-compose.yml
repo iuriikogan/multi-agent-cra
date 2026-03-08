@@ -1,23 +1,15 @@
 version: '3.8'
 
 services:
-  # --- Backend Services ---
-
+  # --- Unified Server (API + Frontend) ---
   server:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         TARGET: server
-    # Override command for development to use go run for hot reloading (optional setup)
-    # or just run the built binary. For "dev env", running from source is often preferred.
-    # Here we use a trick to keep the container running and install air for hot reload if desired,
-    # or just run go run.
-    image: golang:1.25
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: go run ./cmd/server/main.go
+    ports:
+      - "8080:8080"
     environment:
       - PROJECT_ID=test-project
       - REGION=us-central1
@@ -28,8 +20,6 @@ services:
       - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
       - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
       - FIRESTORE_EMULATOR_HOST=firestore:8080
-    ports:
-      - "8080:8080"
     depends_on:
       pubsub:
         condition: service_healthy
@@ -38,17 +28,14 @@ services:
       setup-pubsub:
         condition: service_completed_successfully
 
+  # --- Worker Service ---
   worker:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         TARGET: worker
-    image: golang:1.25
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: go run ./cmd/worker/main.go
+    # In local dev, we run the worker binary directly (or via container entrypoint)
     environment:
       - PROJECT_ID=test-project
       - REGION=us-central1
@@ -58,6 +45,7 @@ services:
       - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
       - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
       - FIRESTORE_EMULATOR_HOST=firestore:8080
+      - PORT=8080 # For health checks
     depends_on:
       pubsub:
         condition: service_healthy
@@ -65,25 +53,6 @@ services:
         condition: service_started
       setup-pubsub:
         condition: service_completed_successfully
-
-  # --- Frontend Service ---
-
-  web:
-    image: node:20-alpine
-    working_dir: /app
-    # Development command
-    command: sh -c "npm install && npm run dev"
-    volumes:
-      - ./web:/app
-      # Anonymous volume to keep node_modules in container
-      - /app/node_modules
-      - /app/.next
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
-    ports:
-      - "3000:3000"
-    depends_on:
-      - server
 
   # --- Infrastructure Emulators ---
 
