@@ -18,9 +18,10 @@ var _ agent.Agent = (*MockAgent)(nil)
 
 // MockAgent implements agent.Agent for testing purposes.
 type MockAgent struct {
-	NameFunc func() string
-	RoleFunc func() string
-	ChatFunc func(ctx context.Context, input string) (string, error)
+	NameFunc  func() string
+	RoleFunc  func() string
+	ChatFunc  func(ctx context.Context, input string) (string, error)
+	CloseFunc func() error
 }
 
 func (m *MockAgent) Name() string {
@@ -42,6 +43,13 @@ func (m *MockAgent) Chat(ctx context.Context, input string) (string, error) {
 		return m.ChatFunc(ctx, input)
 	}
 	return "mock-response", nil
+}
+
+func (m *MockAgent) Close() error {
+	if m.CloseFunc != nil {
+		return m.CloseFunc()
+	}
+	return nil
 }
 
 func TestCoordinator_ProcessStream_Success(t *testing.T) {

@@ -19,6 +19,7 @@ type Agent interface {
 	Name() string
 	Role() string
 	Chat(ctx context.Context, input string) (string, error)
+	Close() error
 }
 
 // GeminiAgent is the concrete implementation using Google's GenAI SDK.
@@ -94,6 +95,13 @@ func New(client *genai.Client, apiKey, name, role, modelName string, opts ...Opt
 
 func (a *GeminiAgent) Name() string { return a.name }
 func (a *GeminiAgent) Role() string { return a.role }
+
+func (a *GeminiAgent) Close() error {
+	if closer, ok := a.executor.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
 
 // Chat executes a single interaction loop.
 // It handles potential tool calls by the model, executes them, and returns the final text response.

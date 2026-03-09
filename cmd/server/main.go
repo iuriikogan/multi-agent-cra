@@ -234,6 +234,15 @@ func startWorker(ctx context.Context, cfg *config.Config, pubsubClient *queue.Cl
 		agent.WithTools(tools.TaggingTools...),
 	)
 
+	// Gracefully close all agents to release resources like Asset Inventory clients
+	defer func() {
+		_ = aggregatorAgent.Close()
+		_ = modelerAgent.Close()
+		_ = validatorAgent.Close()
+		_ = reviewerAgent.Close()
+		_ = taggerAgent.Close()
+	}()
+
 	wf := workflow.NewPubSubWorkflow(pubsubClient, db, cfg.PubSub.TopicMonitoring)
 
 	// Register agent stages
@@ -300,13 +309,10 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 	}
 
 	jsonStr := listResp
-	if start := strings.Index(jsonStr, "```"); start != -1 {
-		if end := strings.LastIndex(jsonStr, "```"); end > start {
-			contentStart := start + 3
-			if newline := strings.Index(jsonStr[contentStart:], "\n"); newline != -1 {
-				contentStart += newline + 1
-			}
-			jsonStr = jsonStr[contentStart:end]
+	// Robust JSON extraction from markdown blocks
+	if start := strings.IndexAny(jsonStr, "[{"); start != -1 {
+		if end := strings.LastIndexAny(jsonStr, "}]"); end != -1 && end > start {
+			jsonStr = jsonStr[start : end+1]
 		}
 	}
 	jsonStr = strings.TrimSpace(jsonStr)
@@ -359,38 +365,43 @@ func startServer(ctx context.Context, cfg *config.Config, pubsubClient *queue.Cl
 		hub.clients[clientChan] = true
 		hub.mu.Unlock()
 
-		defer func() {
-			hub.mu.Lock()
-			delete(hub.clients, clientChan)
-			hub.mu.Unlock()
-		}()
-
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-			return
-		}
-
-		// Keep connection alive with heartbeats
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case msg := <-clientChan:
-				_, _ = fmt.Fprintf(w, "data: %s\n\n", msg)
-				flusher.Flush()
-			case <-ticker.C:
-				// Send a comment to keep the connection alive
-				_, _ = fmt.Fprintf(w, ": keepalive\n\n")
-				flusher.Flush()
-			case <-r.Context().Done():
-				return
-			case <-ctx.Done():
-				return
-			}
-		}
-	})
+		        defer func() {
+		            hub.mu.Lock()
+		            if _, ok := hub.clients[clientChan]; ok {
+		                delete(hub.clients, clientChan)
+		                close(clientChan)
+		            }
+		            hub.mu.Unlock()
+		        }()
+		
+		        flusher, ok := w.(http.Flusher)
+		        if !ok {
+		            http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		            return
+		        }
+		
+		        // Keep connection alive with heartbeats
+		        ticker := time.NewTicker(15 * time.Second)
+		        defer ticker.Stop()
+		
+		        for {
+		            select {
+		            case msg, ok := <-clientChan:
+		                if !ok {
+		                    return
+		                }
+		                _, _ = fmt.Fprintf(w, "data: %s\n\n", msg)
+		                flusher.Flush()
+		            case <-ticker.C:
+		                // Send a comment to keep the connection alive
+		                _, _ = fmt.Fprintf(w, ": keepalive\n\n")
+		                flusher.Flush()
+		            case <-r.Context().Done():
+		                return
+		            case <-ctx.Done():
+		                return
+		            }
+		        }	})
 
 	apiMux.HandleFunc("/api/findings", func(w http.ResponseWriter, r *http.Request) {
 		// This endpoint serves historical CRA findings data, primarily for the dashboard's detailed view.

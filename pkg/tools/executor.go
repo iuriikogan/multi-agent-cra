@@ -22,12 +22,26 @@ type Executor interface {
 
 // DefaultExecutor implements the Executor interface with the standard toolset.
 type DefaultExecutor struct {
-	Client *genai.Client
+	Client      *genai.Client
+	AssetClient *asset.Client
 }
 
 // NewExecutor creates a new DefaultExecutor.
 func NewExecutor(client *genai.Client) *DefaultExecutor {
 	return &DefaultExecutor{Client: client}
+}
+
+// SetAssetClient allows providing a shared Asset Inventory client.
+func (e *DefaultExecutor) SetAssetClient(client *asset.Client) {
+	e.AssetClient = client
+}
+
+// Close releases resources held by the executor.
+func (e *DefaultExecutor) Close() error {
+	if e.AssetClient != nil {
+		return e.AssetClient.Close()
+	}
+	return nil
 }
 
 // Execute routes tool calls to their implementation.
@@ -68,13 +82,15 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 		scope = "projects/" + parent
 	}
 
-	client, err := asset.NewClient(ctx)
-	if err != nil {
-		return fmt.Sprintf("Error creating asset client: %v", err), nil
+	// Use the cached client if available, otherwise create one and cache it
+	if e.AssetClient == nil {
+		var err error
+		e.AssetClient, err = asset.NewClient(ctx)
+		if err != nil {
+			return fmt.Sprintf("Error creating asset client: %v", err), nil
+		}
 	}
-	defer func() {
-		_ = client.Close()
-	}()
+	client := e.AssetClient
 
 	req := &assetpb.ListAssetsRequest{
 		Parent:     scope,

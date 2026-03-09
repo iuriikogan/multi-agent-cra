@@ -2,7 +2,7 @@
 
 This document describes the technical architecture of the Multi-Agent Cyber Resilience Act (CRA) Compliance System. It adheres strictly to the **12-Factor App methodology**, ensuring portability, resilience, and scale on Google Cloud Platform (GCP).
 
-## 🏗️ High-Level Deployment Architecture
+## High-Level Deployment Architecture
 
 The system is deployed as a single compiled Go binary that adapts its behavior based on the `ROLE` environment variable, enabling independent scaling of the API/UI and background processing workloads on Google Cloud Run.
 
@@ -29,7 +29,7 @@ graph TD
     class Server,WorkerFleet,CloudArmor,PubSub_Scan,PubSub_Internal,PubSub_Monitoring,DB,Gemini,GCP_API gcp;
 ```
 
-## 🧠 Agent Pipeline & Data Flow
+## Agent Pipeline & Data Flow
 
 The compliance process is a multi-stage, event-driven pipeline where autonomous AI agents perform specific roles.
 
@@ -78,7 +78,7 @@ sequenceDiagram
     API-->>UI: Server-Sent Events (SSE) Live Update
 ```
 
-## 🔒 Security Controls
+## Security Controls
 
 1.  **Strict 12-Factor Configuration:** No secrets (API keys, DB credentials) are stored in code or configuration files. They are injected exclusively via environment variables at runtime, sourced from Google Secret Manager.
 2.  **Least Privilege Execution:**
@@ -91,7 +91,7 @@ sequenceDiagram
     *   Google Cloud Armor sits in front of the API server, providing WAF and DDoS protection.
     *   **Model Armor** integration inspects incoming requests for prompt injection or jailbreak attempts before they reach the Gemini AI agents.
 
-## 💾 State Management
+## State Management
 
 The system abstracts state management through a `Store` interface, allowing flexibility based on deployment needs:
 

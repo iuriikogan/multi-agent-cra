@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	// Use pure Go SQLite driver to avoid CGO complications during CI/CD and cross-compilation.
@@ -24,6 +25,14 @@ type SQLiteStore struct {
 func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 	if dsn == "" {
 		dsn = ":memory:" // Use ephemeral memory to guarantee clean state across restarts
+	}
+	// Enable foreign key support for data integrity
+	if !strings.Contains(dsn, "_pragma=foreign_keys") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&_pragma=foreign_keys(1)"
+		} else {
+			dsn += "?_pragma=foreign_keys(1)"
+		}
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

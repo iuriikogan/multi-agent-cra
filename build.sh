@@ -6,12 +6,38 @@ PROJECT_ID=$(gcloud config get-value project)
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 # Use region from gcloud config or default to us-central1
 REGION=$(gcloud config get-value compute/region 2>/dev/null)
-REGION=${REGION:-us-central1}
+REGION=${REGION:-europe-west-1}
 REPO_NAME="multi-agent-cra"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+BUCKET_NAME="cra-data-${PROJECT_ID}"
 
 echo "Using Project: $PROJECT_ID ($PROJECT_NUMBER)"
 echo "Using Region: $REGION"
+
+# --- Handle Destroy Flag ---
+if [[ "$1" == "--destroy" || "$1" == "-d" ]]; then
+  echo "Destroy flag detected. Tearing down resources..."
+
+  echo "Deleting Cloud Run services..."
+  gcloud run services delete cra-server --region="$REGION" --quiet || true
+  gcloud run services delete cra-worker --region="$REGION" --quiet || true
+
+  echo "Deleting Pub/Sub subscription and topic..."
+  gcloud pubsub subscriptions delete scan-requests-sub --quiet || true
+  gcloud pubsub topics delete scan-requests --quiet || true
+
+  echo "Deleting GCS Bucket..."
+  gcloud storage rm -r "gs://${BUCKET_NAME}" --quiet || true
+
+  echo "Deleting Secret Manager secret..."
+  gcloud secrets delete GEMINI_API_KEY --quiet || true
+
+  echo "Deleting Artifact Registry repository..."
+  gcloud artifacts repositories delete "$REPO_NAME" --location="$REGION" --quiet || true
+
+  echo "Resource teardown complete."
+  exit 0
+fi
 
 # --- 1. Enable Required Services ---
 echo "Enabling GCP services..."
@@ -58,7 +84,6 @@ gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
   --quiet
 
 # --- 4. Setup GCS Bucket (Data Persistence) ---
-BUCKET_NAME="cra-data-${PROJECT_ID}"
 if ! gcloud storage buckets describe "gs://${BUCKET_NAME}" &>/dev/null; then
   echo "Creating GCS Bucket: ${BUCKET_NAME}..."
   gcloud storage buckets create "gs://${BUCKET_NAME}" --location="$REGION" --uniform-bucket-level-access
@@ -88,7 +113,7 @@ else
   echo "Pub/Sub subscription 'scan-requests-sub' already exists."
 fi
 
-# --- 5. Fix Cloud Build Permissions (Artifact Registry & Logging) ---
+# --- 6. Fix Cloud Build Permissions (Artifact Registry & Logging) ---
 # The default compute SA needs writer access to AR and log writer access
 echo "Granting Artifact Registry Writer role to Compute SA..."
 gcloud artifacts repositories add-iam-policy-binding "$REPO_NAME" \
@@ -126,6 +151,6 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/pubsub.subscriber" \
   --quiet
 
-# --- 6. Trigger Cloud Build ---
+# --- 7. Trigger Cloud Build ---
 echo "Starting Cloud Build..."
 gcloud builds submit --config=cloudbuild.yaml .

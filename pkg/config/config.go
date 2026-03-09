@@ -57,7 +57,7 @@ func Load() *Config {
 		APIKey:        os.Getenv("GEMINI_API_KEY"),
 		GCSBucketName: getEnv("GCS_BUCKET_NAME", "cra-data-"+projectID),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		DatabaseType:  getEnv("DATABASE_TYPE", "SQLITE_MEM"),
+		DatabaseType:  os.Getenv("DATABASE_TYPE"),
 		StoreType:     getEnv("STORE_TYPE", "gcs"),
 		PubSub: PubSubConfig{
 			TopicScanRequests: getEnv("PUBSUB_TOPIC_SCAN_REQUESTS", "scan-requests"),

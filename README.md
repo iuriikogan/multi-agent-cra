@@ -4,35 +4,35 @@
 
 A scalable, event-driven multi-agent system designed to assess Google Cloud infrastructure against the EU Cyber Resilience Act (CRA). The goal is to provide Security Engineers with a real-time, dashboard-driven tool to monitor, audit, and enforce CRA compliance across their GCP estate.
 
-## 🚀 Key Features
+## Key Features
 
-*   **Autonomous Agents:** Specialized AI agents for Discovery (Aggregator), Modeling, Validation, Review, and Tagging.
-*   **Real-time Dashboard:** A Next.js frontend embedded in the Go binary featuring live Server-Sent Events (SSE) log streaming and interactive compliance charts.
-*   **12-Factor Architecture:** Built for the cloud. Configuration is strictly environment-variable driven. The application scales independently by setting the `ROLE` variable (`server`, `worker`, or `all`).
-*   **Event-Driven:** Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
-*   **Flexible Storage:** Choose between robust **Cloud SQL** (PostgreSQL) for production or lightweight in-memory **SQLite** for zero-dependency local development.
-*   **AI-Powered:** Leverages Gemini 1.5/3.0 for deep reasoning and compliance mapping via the native Go SDK.
+*   Autonomous Agents: Specialized AI agents for Discovery (Aggregator), Modeling, Validation, Review, and Tagging.
+*   Real-time Dashboard: A Next.js frontend embedded in the Go binary featuring live Server-Sent Events (SSE) log streaming and interactive compliance charts.
+*   12-Factor Architecture: Built for the cloud. Configuration is strictly environment-variable driven. The application scales independently by setting the ROLE variable (server, worker, or all).
+*   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
+*   Flexible Storage: Choose between robust Cloud SQL (PostgreSQL) for production or lightweight in-memory SQLite for zero-dependency local development.
+*   AI-Powered: Leverages Gemini 1.5/3.0 for deep reasoning and compliance mapping via the native Go SDK.
 
-## 🏗️ System Architecture & Data Flow
+## System Architecture and Data Flow
 
 The system uses a strictly decoupled producer-consumer model:
 
-1.  **Frontend (UI):** Users interact with the embedded React dashboard to initiate scans or view historical CRA findings.
-2.  **API Server (`ROLE=server`):** Receives HTTP scan requests, publishes them to Pub/Sub, and serves historical data from the database. It also maintains long-lived SSE connections to broadcast internal monitoring events to the browser.
-3.  **Message Broker (Pub/Sub):** Manages discrete topics for every stage of the agent pipeline (`scan-requests` -> `aggregator` -> `modeler` -> `validator` -> `reviewer` -> `tagger`).
-4.  **Worker Fleet (`ROLE=worker`):** Stateless background processes that consume Pub/Sub messages, execute Gemini agent logic, interact with GCP APIs (like Cloud Asset Inventory), and write findings to the database.
-5.  **State Store:** 
-    *   **Cloud SQL (Production):** Persistent storage of scan metadata and compliance findings.
-    *   **SQLite (Local):** In-memory ephemeral storage for rapid testing.
+1.  Frontend (UI): Users interact with the embedded React dashboard to initiate scans or view historical CRA findings.
+2.  API Server (ROLE=server): Receives HTTP scan requests, publishes them to Pub/Sub, and serves historical data from the database. It also maintains long-lived SSE connections to broadcast internal monitoring events to the browser.
+3.  Message Broker (Pub/Sub): Manages discrete topics for every stage of the agent pipeline (scan-requests -> aggregator -> modeler -> validator -> reviewer -> tagger).
+4.  Worker Fleet (ROLE=worker): Stateless background processes that consume Pub/Sub messages, execute Gemini agent logic, interact with GCP APIs (like Cloud Asset Inventory), and write findings to the database.
+5.  State Store: 
+    *   Cloud SQL (Production): Persistent storage of scan metadata and compliance findings.
+    *   SQLite (Local): In-memory ephemeral storage for rapid testing.
 
 ### Security Controls
-*   **Least Privilege:** Workers operate using dedicated Google Service Accounts with minimal permissions required for Asset Inventory and Pub/Sub.
-*   **No Hardcoded Secrets:** API keys and Database URLs are injected securely at runtime via environment variables (Factor III).
-*   **Network Isolation:** Cloud SQL instances should be deployed with private IPs. The `cra-worker` does not expose any inbound ports.
+*   Least Privilege: Workers operate using dedicated Google Service Accounts with minimal permissions required for Asset Inventory and Pub/Sub.
+*   No Hardcoded Secrets: API keys and Database URLs are injected securely at runtime via environment variables (Factor III).
+*   Network Isolation: Cloud SQL instances should be deployed with private IPs. The cra-worker does not expose any inbound ports.
 
-## 📂 Project Structure
+## Project Structure
 
-```
+```text
 ├── cmd/
 │   ├── server/      # Unified Entrypoint (API + UI + Config Routing)
 │   └── worker/      # Legacy entrypoint (now handled by cmd/server via ROLE)
@@ -47,47 +47,54 @@ The system uses a strictly decoupled producer-consumer model:
 └── terraform/       # IaC definitions for GCP deployment
 ```
 
-## 🛠️ Deployment Instructions
+## Prerequisites
 
-### Local Development (Zero Dependencies)
+Before deploying the application locally or in production, ensure the following prerequisites are met:
 
-The easiest way to run the platform locally is using the in-memory SQLite database and running both the server and worker in a single process.
+*   Google Cloud Platform project with billing enabled.
+*   Valid Google Cloud credentials configured (`gcloud auth application-default login`).
+*   Go 1.22 or higher installed.
+*   A valid Gemini API Key.
+*   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com.
 
-1.  **Set Environment Variables**:
+## Steps
+
+### Local Deployment
+
+1.  Set the required environment variables:
     ```bash
     export GEMINI_API_KEY="your_actual_api_key_here"
     export PROJECT_ID="your-gcp-project-id"
-    export ROLE="all" # Runs both API and background workers
-    export DATABASE_TYPE="SQLITE_MEM" # Uses in-memory DB
-    # Ensure you have valid GCP credentials for Pub/Sub and Asset Inventory:
-    # gcloud auth application-default login
+    export ROLE="all"
+    export DATABASE_TYPE="SQLITE_MEM"
     ```
-
-2.  **Run the Application**:
+2.  Run the application:
     ```bash
     go run ./cmd/server
     ```
-    *   **Dashboard & API:** http://localhost:8080
 
-### Production Deployment (Cloud Run & Cloud SQL)
+### Production Deployment
 
-For production, deploy the `server` and `worker` as separate Cloud Run services to scale them independently.
+For production deployments to Google Cloud Run, execute the build script:
 
-1.  **Database Setup:** Provision a Cloud SQL (PostgreSQL) instance and obtain the connection string.
-2.  **Pub/Sub Setup:** Ensure all topics and subscriptions defined in `pkg/config/config.go` exist in your GCP project.
-3.  **Deploy API Server**:
+```bash
+./build.sh
+```
+
+## Verification
+
+To verify the deployment:
+
+1.  Navigate to the provided dashboard URL (e.g., http://localhost:8080 or the Cloud Run service URL).
+2.  Initiate a test scan from the UI.
+3.  Check the server logs to ensure Pub/Sub messages are being processed and the state is written to the database without errors.
+
+## Rollback
+
+To tear down all resources and roll back the deployment in GCP:
+
+1.  Run the build script with the destroy flag:
     ```bash
-    gcloud run deploy cra-server \
-      --source . \
-      --set-env-vars="ROLE=server,DATABASE_TYPE=CLOUD_SQL,DATABASE_URL=postgres://user:pass@host/db" \
-      --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
-      --allow-unauthenticated
+    ./build.sh --destroy
     ```
-4.  **Deploy Worker**:
-    ```bash
-    gcloud run deploy cra-worker \
-      --source . \
-      --set-env-vars="ROLE=worker,DATABASE_TYPE=CLOUD_SQL,DATABASE_URL=postgres://user:pass@host/db" \
-      --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
-      --no-allow-unauthenticated
-    ```
+2.  (Local) Stop the running process (Ctrl+C).

@@ -10,6 +10,12 @@ resource "google_compute_subnetwork" "default" {
   ip_cidr_range = "10.0.0.0/24"
   network       = google_compute_network.vpc.id
   region        = var.region
+
+  log_config {
+    aggregation_interval = "INTERVAL_10_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_vpc_access_connector" "serverless" {
