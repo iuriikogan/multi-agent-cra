@@ -11,8 +11,7 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   12-Factor Architecture: Built for the cloud. Configuration is strictly environment-variable driven. The application scales independently by setting the ROLE variable (server, worker, or all).
 *   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
 *   Flexible Storage: Choose between robust Cloud SQL (PostgreSQL) for production or lightweight in-memory SQLite for zero-dependency local development.
-*   AI-Powered: Leverages Gemini 1.5/3.0 for deep reasoning and compliance mapping via the native Go SDK.
-
+*   
 ## System Architecture and Data Flow
 
 The system uses a strictly decoupled producer-consumer model:
