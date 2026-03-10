@@ -1,4 +1,7 @@
 # Use a multi-stage build for production efficiency
+FROM golang:1.24 AS backend-builder
+WORKDIR /app
+ENV GOTOOLCHAIN=auto
 
 # Copy Go dependencies
 COPY go.mod go.sum ./

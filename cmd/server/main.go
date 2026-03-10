@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	"github.com/iuriikogan/multi-agent-cra/internal/server"
-	"github.com/iuriikogan/multi-agent-cra/internal/worker"
 	"github.com/iuriikogan/multi-agent-cra/pkg/config"
 	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
 	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
@@ -24,12 +23,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	role := os.Getenv("ROLE")
-	if role == "" {
-		role = "all"
-	}
-
-	slog.Info("Starting Multi-Agent CRA", "role", role, "project_id", cfg.ProjectID)
+	slog.Info("Starting Multi-Agent CRA Server", "project_id", cfg.ProjectID)
 
 	pubsubClient, err := queue.NewClient(ctx, cfg.ProjectID)
 	if err != nil {
@@ -64,44 +58,27 @@ func main() {
 	hub := server.NewHub()
 	go hub.Run(ctx)
 	
-	if role == "server" || role == "all" {
-		go func() {
-			err := pubsubClient.Subscribe(ctx, cfg.PubSub.SubMonitoring, func(ctx context.Context, data []byte) error {
-				hub.Broadcast <- string(data)
-				return nil
-			})
-			if err != nil && ctx.Err() == nil {
-				slog.Error("Monitoring subscription error", "error", err)
-			}
-		}()
-	}
+	go func() {
+		err := pubsubClient.Subscribe(ctx, cfg.PubSub.SubMonitoring, func(ctx context.Context, data []byte) error {
+			hub.Broadcast <- string(data)
+			return nil
+		})
+		if err != nil && ctx.Err() == nil {
+			slog.Error("Monitoring subscription error", "error", err)
+		}
+	}()
 
-	switch role {
-	case "worker":
-		if err := worker.Start(ctx, cfg, pubsubClient, storeClient); err != nil {
-			slog.Error("Worker failed", "error", err)
-			os.Exit(1)
-		}
+	errChan := make(chan error, 1)
+	go func() {
 		if err := server.Start(ctx, cfg, pubsubClient, storeClient, hub); err != nil {
-			slog.Error("Server failed", "error", err)
-			os.Exit(1)
+			errChan <- fmt.Errorf("server error: %w", err)
 		}
-	case "all":
-		errChan := make(chan error, 1)
-		go func() {
-			if err := server.Start(ctx, cfg, pubsubClient, storeClient, hub); err != nil {
-				errChan <- fmt.Errorf("server error: %w", err)
-			}
-		}()
-		select {
-		case <-ctx.Done():
-			slog.Info("Shutting down all processes...")
-		case err := <-errChan:
-			slog.Error("Process failed", "error", err)
-			os.Exit(1)
-		}
-	default:
-		slog.Error("Unknown ROLE", "role", role)
+	}()
+	select {
+	case <-ctx.Done():
+		slog.Info("Shutting down processes...")
+	case err := <-errChan:
+		slog.Error("Process failed", "error", err)
 		os.Exit(1)
 	}
 }
