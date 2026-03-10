@@ -46,7 +46,7 @@ resource "google_sql_database_instance" "main" {
       value = "error"
     }
     database_flags {
-      name  = "cloudsql_iam_authentication"
+      name  = "cloudsql.iam_authentication"
       value = "on"
     }
   }

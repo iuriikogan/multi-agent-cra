@@ -34,11 +34,16 @@ The system uses a strictly decoupled producer-consumer model:
 
 ```text
 ├── cmd/
-│   ├── server/      # Unified Entrypoint (API + UI + Config Routing)
-│   └── worker/      # Legacy entrypoint (now handled by cmd/server via ROLE)
+│   ├── batch/       # Batch execution mode entrypoint
+│   ├── server/      # Core API and WebSocket server entrypoint
+│   └── worker/      # Pub/Sub background worker entrypoint
+├── internal/
+│   ├── batch/       # Batch processing and reporting logic
+│   ├── server/      # HTTP handlers and SSE Hub logic
+│   └── worker/      # Agent initialization and Pub/Sub subscriptions
 ├── pkg/
 │   ├── agent/       # Gemini AI Agent logic
-│   ├── config/      # Centralized 12-factor configuration
+│   ├── config/      # Centralized Configuration
 │   ├── queue/       # Pub/Sub client implementations
 │   ├── store/       # Cloud SQL and SQLite implementations
 │   ├── tools/       # GCP SDK and LLM tool definitions

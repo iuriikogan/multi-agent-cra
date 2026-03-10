@@ -1,6 +1,6 @@
 # System Architecture & Security Design
 
-This document describes the technical architecture of the Multi-Agent Cyber Resilience Act (CRA) Compliance System. It adheres strictly to the **12-Factor App methodology**, ensuring portability, resilience, and scale on Google Cloud Platform (GCP).
+This document describes the technical architecture of the Multi-Agent Cyber Resilience Act (CRA) Compliance System.
 
 ## High-Level Deployment Architecture
 

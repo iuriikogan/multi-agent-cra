@@ -1,15 +1,16 @@
 steps:
-  # 1. Build Unified Server Image (Frontend + Backend + Worker)
+  # --- SERVER BUILD & DEPLOY ---
+  # 1. Build Server Image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build Server'
     args: ['build', '--build-arg', 'TARGET=server', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}', '.']
   
-  # 2. Push Image
+  # 2. Push Server Image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Push Server'
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}']
 
-  # 3. Deploy Unified Service
+  # 3. Deploy Server Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Server'
     entrypoint: gcloud
@@ -22,21 +23,53 @@ steps:
       - '--region'
       - '${_REGION}'
       - '--set-env-vars'
-      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID}'
+      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID},ROLE=server'
+      - '--set-secrets'
+      - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+
+  # --- WORKER BUILD & DEPLOY ---
+  # 4. Build Worker Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Worker'
+    args: ['build', '--build-arg', 'TARGET=worker', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}', '.']
+  
+  # 5. Push Worker Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Worker'
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}']
+
+  # 6. Deploy Worker Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Worker'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cra-worker'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
+      - '--region'
+      - '${_REGION}'
+      - '--set-env-vars'
+      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID},ROLE=worker'
       - '--set-env-vars'
       - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      - '--allow-unauthenticated'
-      # Force CPU allocation even when idle so background worker (subscriber) keeps running
+      - '--no-allow-unauthenticated'
+      # Force CPU allocation even when idle so background worker (pubsub pull subscriber) keeps running
       - '--no-cpu-throttling' 
       - '--min-instances'
       - '1'
 
 substitutions:
-  _REGION: europe-west1
+  _REGION: us-central1
   _REPO_NAME: multi-agent-cra
   _TAG: latest
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'

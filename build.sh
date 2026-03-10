@@ -1,12 +1,12 @@
 #!/bin/bash
-set -e
+set -x
 
 # --- Configuration ---
 PROJECT_ID=$(gcloud config get-value project)
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 # Use region from gcloud config or default to us-central1
 REGION=$(gcloud config get-value compute/region 2>/dev/null)
-REGION=${REGION:-europe-west-1}
+REGION=${REGION:-europe-west1}
 REPO_NAME="multi-agent-cra"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 BUCKET_NAME="cra-data-${PROJECT_ID}"
@@ -90,7 +90,7 @@ if ! gcloud storage buckets describe "gs://${BUCKET_NAME}" &>/dev/null; then
 else
   echo "GCS Bucket ${BUCKET_NAME} already exists."
 fi
-
+sleep 10
 # Grant Object Admin to Compute SA
 echo "Granting Storage Object Admin to Compute SA..."
 gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
@@ -153,4 +153,4 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
 # --- 7. Trigger Cloud Build ---
 echo "Starting Cloud Build..."
-gcloud builds submit --config=cloudbuild.yaml .
+gcloud builds submit --config=cloudbuild.yaml --substitutions=_REGION="$REGION" .
