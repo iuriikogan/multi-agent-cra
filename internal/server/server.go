@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -54,7 +52,7 @@ func (h *Hub) Run(ctx context.Context) {
 }
 
 // NewAppHandler constructs the main server handler
-func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store, hub *Hub, staticFs fs.FS) http.Handler {
+func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store, hub *Hub) http.Handler {
 	apiMux := http.NewServeMux()
 
 	apiMux.HandleFunc("/api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -139,39 +137,12 @@ func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.
 		}
 	})
 
-	var fileServer http.Handler
-	if staticFs != nil {
-		fileServer = http.FileServer(http.FS(staticFs))
-	} else {
-		// fallback to serving current dir just to avoid panic in test
-		fileServer = http.FileServer(http.Dir("."))
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle("/api/", apiMux)
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if staticFs != nil {
-			f, err := staticFs.Open(strings.TrimPrefix(r.URL.Path, "/"))
-			if err == nil {
-				_ = f.Close()
-				fileServer.ServeHTTP(w, r)
-				return
-			}
-		}
-		if !strings.HasPrefix(r.URL.Path, "/api/") {
-			r.URL.Path = "/"
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-
-	return mux
+	return apiMux
 }
 
 // Start initiates the HTTP server process
-func Start(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store, hub *Hub, staticFs fs.FS) error {
-	mux := NewAppHandler(ctx, cfg, pubsubClient, db, hub, staticFs)
+func Start(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store, hub *Hub) error {
+	mux := NewAppHandler(ctx, cfg, pubsubClient, db, hub)
 
 	port := cfg.Server.Port
 	if port == "" {

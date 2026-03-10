@@ -1,16 +1,28 @@
 steps:
+  # --- FRONTEND BUILD & DEPLOY ---
+  # 1. Build Frontend Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Frontend'
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/frontend:${_TAG}', '-f', 'web/Dockerfile', 'web/']
+  
+  # 2. Push Frontend Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Frontend'
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/frontend:${_TAG}']
+
+
   # --- SERVER BUILD & DEPLOY ---
-  # 1. Build Server Image
+  # 4. Build Server Image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build Server'
     args: ['build', '--build-arg', 'TARGET=server', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}', '.']
   
-  # 2. Push Server Image
+  # 5. Push Server Image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Push Server'
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}']
 
-  # 3. Deploy Server Service
+  # 6. Deploy Server Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Server'
     entrypoint: gcloud
@@ -30,6 +42,20 @@ steps:
       - '--min-instances'
       - '1'
 
+  # 7. Deploy Frontend Service (requires Server URL)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        SERVER_URL=$$(gcloud run services describe cra-server --region=${_REGION} --format="value(status.url)")
+        gcloud run deploy cra-dashboard \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/frontend:${_TAG} \
+          --region=${_REGION} \
+          --allow-unauthenticated \
+          --set-env-vars="API_URL=$$SERVER_URL"
+
   # --- WORKER BUILD & DEPLOY ---
   # 4. Build Worker Image
   - name: 'gcr.io/cloud-builders/docker'
@@ -41,7 +67,7 @@ steps:
     id: 'Push Worker'
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}']
 
-  # 6. Deploy Worker Service
+  # 9. Deploy Worker Service (Push Webhook)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Worker'
     entrypoint: gcloud
@@ -59,11 +85,11 @@ steps:
       - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      - '--no-allow-unauthenticated'
-      # Force CPU allocation even when idle so background worker (pubsub pull subscriber) keeps running
-      - '--no-cpu-throttling' 
+      # Must be unauthenticated for basic HTTP Pub/Sub push in simple deployment
+      - '--allow-unauthenticated'
+      # Allow scaling to 0, no CPU allocation when idle required anymore!
       - '--min-instances'
-      - '1'
+      - '0'
 
 substitutions:
   _REGION: us-central1
@@ -71,5 +97,6 @@ substitutions:
   _TAG: latest
 
 images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/frontend:${_TAG}'
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'

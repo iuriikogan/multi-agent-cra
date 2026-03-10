@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -19,13 +20,12 @@ import (
 	"google.golang.org/api/option"
 )
 
-// Start initiates the worker process
-func Start(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store) error {
+// RegisterRoutes sets up the HTTP handlers for Pub/Sub push messages
+func RegisterRoutes(ctx context.Context, mux *http.ServeMux, cfg *config.Config, pubsubClient *queue.Client, db store.Store) (func(), error) {
 	genaiClient, err := genai.NewClient(ctx, option.WithAPIKey(cfg.APIKey))
 	if err != nil {
-		return fmt.Errorf("failed to create GenAI client: %w", err)
+		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
 	}
-	defer genaiClient.Close()
 
 	aggregatorAgent := agent.New(genaiClient, cfg.APIKey, "ResourceAggregator", "Ingestion", "gemini-3.1-flash-lite-preview",
 		agent.WithSystemInstruction(`You are an expert Google Cloud Resource Aggregator.
@@ -68,52 +68,59 @@ Example: APPLIED_TAGS: cra_status=non_compliant,remediation=urgent`),
 		agent.WithTools(tools.TaggingTools...),
 	)
 
-	defer func() {
+	cleanup := func() {
 		_ = aggregatorAgent.Close()
 		_ = modelerAgent.Close()
 		_ = validatorAgent.Close()
 		_ = reviewerAgent.Close()
 		_ = taggerAgent.Close()
-	}()
+		_ = genaiClient.Close()
+	}
 
 	wf := workflow.NewPubSubWorkflow(pubsubClient, db, cfg.PubSub.TopicMonitoring)
 
-	go func() {
-		_ = wf.StartStage(ctx, cfg.PubSub.SubAggregator, cfg.PubSub.TopicModeler, aggregatorAgent, workflow.ProcessAggregation)
-	}()
-	go func() {
-		_ = wf.StartStage(ctx, cfg.PubSub.SubModeler, cfg.PubSub.TopicValidator, modelerAgent, workflow.ProcessModeling)
-	}()
-	go func() {
-		_ = wf.StartStage(ctx, cfg.PubSub.SubValidator, cfg.PubSub.TopicReviewer, validatorAgent, workflow.ProcessValidation)
-	}()
-	go func() {
-		_ = wf.StartStage(ctx, cfg.PubSub.SubReviewer, cfg.PubSub.TopicTagger, reviewerAgent, workflow.ProcessReview)
-	}()
-	go func() {
-		_ = wf.StartStage(ctx, cfg.PubSub.SubTagger, "", taggerAgent, workflow.ProcessTagging)
-	}()
+	wf.RegisterPushHandler(mux, "/pubsub/aggregator", cfg.PubSub.TopicModeler, aggregatorAgent, workflow.ProcessAggregation)
+	wf.RegisterPushHandler(mux, "/pubsub/modeler", cfg.PubSub.TopicValidator, modelerAgent, workflow.ProcessModeling)
+	wf.RegisterPushHandler(mux, "/pubsub/validator", cfg.PubSub.TopicReviewer, validatorAgent, workflow.ProcessValidation)
+	wf.RegisterPushHandler(mux, "/pubsub/reviewer", cfg.PubSub.TopicTagger, reviewerAgent, workflow.ProcessReview)
+	wf.RegisterPushHandler(mux, "/pubsub/tagger", "", taggerAgent, workflow.ProcessTagging)
 
-	slog.Info("Worker started: Listening for scan requests...")
-	err = pubsubClient.Subscribe(ctx, cfg.PubSub.SubScanRequests, func(ctx context.Context, data []byte) error {
+	slog.Info("Worker routes registered. Listening for push requests...")
+	
+	mux.HandleFunc("/pubsub/scan-requests", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req workflow.PushMessage
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
 		var job struct {
 			JobID string `json:"job_id"`
 			Scope string `json:"scope"`
 		}
-		if err := json.Unmarshal(data, &job); err != nil {
-			return fmt.Errorf("failed to parse job: %w", err)
+		if err := json.Unmarshal(req.Message.Data, &job); err != nil {
+			slog.Error("Failed to parse job from push", "error", err)
+			// Return 200 so pubsub doesn't retry hopelessly bad payloads
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 
 		slog.Info("Processing scan request", "job_id", job.JobID)
 
 		if db != nil {
-			if err := db.CreateScan(ctx, job.JobID, job.Scope); err != nil {
+			if err := db.CreateScan(r.Context(), job.JobID, job.Scope); err != nil {
 				slog.Error("Failed to create scan record", "error", err)
-				return err
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
 			}
 		}
 
-		err := runScan(ctx, cfg, pubsubClient, aggregatorAgent, job.Scope, job.JobID, db)
+		err := runScan(r.Context(), cfg, pubsubClient, aggregatorAgent, job.Scope, job.JobID, db)
 
 		status := "completed"
 		if err != nil {
@@ -122,17 +129,20 @@ Example: APPLIED_TAGS: cra_status=non_compliant,remediation=urgent`),
 		}
 
 		if db != nil {
-			if err := db.UpdateScanStatus(ctx, job.JobID, status); err != nil {
+			if err := db.UpdateScanStatus(r.Context(), job.JobID, status); err != nil {
 				slog.Error("Failed to update status", "error", err)
 			}
 		}
-		return nil
+
+		if err != nil {
+			http.Error(w, "scan failed", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
 	})
-	if err != nil && ctx.Err() == nil {
-		return fmt.Errorf("subscription error: %w", err)
-	}
-	slog.Info("Worker stopped")
-	return nil
+
+	return cleanup, nil
 }
 
 func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, aggregator agent.Agent, scope, jobID string, db store.Store) error {

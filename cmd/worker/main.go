@@ -76,22 +76,19 @@ func main() {
 	}
 	defer storeClient.Close()
 
+	cleanupWorker, err := worker.RegisterRoutes(ctx, mux, cfg, pubsubClient, storeClient)
+	if err != nil {
+		slog.Error("Failed to register worker routes", "error", err)
+		os.Exit(1)
+	}
+
 	g, gCtx := errgroup.WithContext(ctx)
 
 	// Start Health Server
 	g.Go(func() error {
-		slog.Info("Starting health check server", "port", port)
+		slog.Info("Starting combined health check and worker server", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			return fmt.Errorf("health check server failed: %w", err)
-		}
-		return nil
-	})
-
-	// Start Worker
-	g.Go(func() error {
-		slog.Info("Starting worker process")
-		if err := worker.Start(gCtx, cfg, pubsubClient, storeClient); err != nil {
-			return fmt.Errorf("worker process failed: %w", err)
+			return fmt.Errorf("server failed: %w", err)
 		}
 		return nil
 	})
@@ -103,7 +100,10 @@ func main() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			slog.Error("Health server shutdown failed", "error", err)
+			slog.Error("Server shutdown failed", "error", err)
+		}
+		if cleanupWorker != nil {
+			cleanupWorker()
 		}
 		return nil
 	})

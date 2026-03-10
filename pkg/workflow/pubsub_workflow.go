@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
@@ -31,39 +32,73 @@ func NewPubSubWorkflow(client *queue.Client, db store.Store, monitoringTopic str
 	return &PubSubWorkflow{client: client, db: db, monitoringTopic: monitoringTopic}
 }
 
-// StartStage initializes a subscriber for a specific agent stage.
-func (w *PubSubWorkflow) StartStage(ctx context.Context, subID string, nextTopic string, a agent.Agent, processor func(ctx context.Context, a agent.Agent, task *AgentTask) error) error {
-	return w.client.Subscribe(ctx, subID, func(ctx context.Context, data []byte) error {
-		var task AgentTask
-		if err := json.Unmarshal(data, &task); err != nil {
-			return fmt.Errorf("failed to unmarshal task: %w", err)
+// PushMessage represents the Pub/Sub push HTTP payload
+type PushMessage struct {
+	Message struct {
+		Data []byte `json:"data"`
+	} `json:"message"`
+}
+
+// RegisterPushHandler creates an HTTP handler for a specific agent stage.
+func (w *PubSubWorkflow) RegisterPushHandler(mux *http.ServeMux, pattern string, nextTopic string, a agent.Agent, processor func(ctx context.Context, a agent.Agent, task *AgentTask) error) {
+	mux.HandleFunc(pattern, func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(rw, "Method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
 
-		slog.Info("Agent processing stage", "agent", a.Name(), "job_id", task.JobID, "resource", task.Resource.Name)
+		var req PushMessage
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			slog.Error("Failed to decode push request", "error", err)
+			http.Error(rw, "bad request", http.StatusBadRequest)
+			return
+		}
 
-		// Emit "StepStarted" event
+		var task AgentTask
+		if err := json.Unmarshal(req.Message.Data, &task); err != nil {
+			slog.Error("Failed to unmarshal task from push data", "error", err)
+			// Return 200 to ack unparseable messages so they don't loop endlessly
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+
+		ctx := r.Context()
+		slog.Info("Agent processing push stage", "agent", a.Name(), "job_id", task.JobID, "resource", task.Resource.Name)
+
 		w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "started", "")
 
 		if err := processor(ctx, a, &task); err != nil {
 			slog.Error("Agent processing failed", "agent", a.Name(), "error", err)
 			w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "failed", err.Error())
-			return err
+			// Return 500 so Pub/Sub retries this task
+			http.Error(rw, "processing failed", http.StatusInternalServerError)
+			return
 		}
 
-		// Emit "StepCompleted" event
 		w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "completed", "")
 
 		if nextTopic != "" {
 			nextData, _ := json.Marshal(task)
-			return w.client.Publish(ctx, nextTopic, nextData)
+			if err := w.client.Publish(ctx, nextTopic, nextData); err != nil {
+				slog.Error("Failed to publish to next topic", "error", err)
+				http.Error(rw, "publish failed", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			// Final stage: Save finding to DB
+			finding := store.Finding{
+				ResourceName: task.Resource.Name,
+				Status:       fmt.Sprintf("%v", task.Result.ApprovalStatus),
+				Details:      "Final CRA compliance result",
+			}
+			if err := w.db.AddFinding(ctx, task.JobID, finding); err != nil {
+				slog.Error("Failed to save final finding", "error", err)
+				http.Error(rw, "db error", http.StatusInternalServerError)
+				return
+			}
 		}
 
-		// If no next topic, this is the final stage
-		return w.db.AddFinding(ctx, task.JobID, store.Finding{
-			ResourceName: task.Resource.Name,
-			Status:       fmt.Sprintf("%v", task.Result.ApprovalStatus),
-			Details:      "Final CRA compliance result",
-		})
+		rw.WriteHeader(http.StatusOK)
 	})
 }
 

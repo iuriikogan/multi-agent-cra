@@ -21,11 +21,20 @@ if [[ "$1" == "--destroy" || "$1" == "-d" ]]; then
   echo "Deleting Cloud Run services..."
   gcloud run services delete cra-server --region="$REGION" --quiet || true
   gcloud run services delete cra-worker --region="$REGION" --quiet || true
+  gcloud run services delete cra-dashboard --region="$REGION" --quiet || true
 
-  echo "Deleting Pub/Sub subscription and topic..."
-  gcloud pubsub subscriptions delete scan-requests-sub --quiet || true
-  gcloud pubsub topics delete scan-requests --quiet || true
+  echo "Deleting Pub/Sub subscriptions and topics..."
+  SUBS=("scan-requests-sub" "aggregator-tasks-sub" "modeler-tasks-sub" "validator-tasks-sub" "reviewer-tasks-sub" "tagger-tasks-sub" "monitoring-events-sub")
+  TOPICS=("scan-requests" "aggregator-tasks" "modeler-tasks" "validator-tasks" "reviewer-tasks" "tagger-tasks" "monitoring-events")
+  
+  for SUB in "${SUBS[@]}"; do
+    gcloud pubsub subscriptions delete "$SUB" --quiet || true
+  done
 
+  for TOPIC in "${TOPICS[@]}"; do
+    gcloud pubsub topics delete "$TOPIC" --quiet || true
+  done
+  
   echo "Deleting GCS Bucket..."
   gcloud storage rm -r "gs://${BUCKET_NAME}" --quiet || true
 
@@ -99,19 +108,17 @@ gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
   --quiet
 
 # --- 5. Setup Pub/Sub ---
-if ! gcloud pubsub topics describe scan-requests &>/dev/null; then
-  echo "Creating Pub/Sub topic: scan-requests..."
-  gcloud pubsub topics create scan-requests
-else
-  echo "Pub/Sub topic 'scan-requests' already exists."
-fi
+TOPICS=("scan-requests" "aggregator-tasks" "modeler-tasks" "validator-tasks" "reviewer-tasks" "tagger-tasks" "monitoring-events")
+SUBS=("scan-requests-sub" "aggregator-tasks-sub" "modeler-tasks-sub" "validator-tasks-sub" "reviewer-tasks-sub" "tagger-tasks-sub" "monitoring-events-sub")
 
-if ! gcloud pubsub subscriptions describe scan-requests-sub &>/dev/null; then
-  echo "Creating Pub/Sub subscription: scan-requests-sub..."
-  gcloud pubsub subscriptions create scan-requests-sub --topic=scan-requests
-else
-  echo "Pub/Sub subscription 'scan-requests-sub' already exists."
-fi
+for TOPIC in "${TOPICS[@]}"; do
+  if ! gcloud pubsub topics describe "$TOPIC" &>/dev/null; then
+    echo "Creating Pub/Sub topic: $TOPIC..."
+    gcloud pubsub topics create "$TOPIC"
+  else
+    echo "Pub/Sub topic '$TOPIC' already exists."
+  fi
+done
 
 # --- 6. Fix Cloud Build Permissions (Artifact Registry & Logging) ---
 # The default compute SA needs writer access to AR and log writer access
@@ -151,6 +158,66 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/pubsub.subscriber" \
   --quiet
 
+echo "Granting Cloud Asset Viewer role to Compute SA (required for list_gcp_assets tool)..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$COMPUTE_SA" \
+  --role="roles/cloudasset.viewer" \
+  --quiet
+
 # --- 7. Trigger Cloud Build ---
-echo "Starting Cloud Build..."
+echo "Starting Cloud Build to build and deploy services..."
 gcloud builds submit --config=cloudbuild.yaml --substitutions=_REGION="$REGION" .
+
+# --- 8. Setup Pub/Sub Push Subscriptions ---
+echo "Getting Worker Service URL..."
+WORKER_URL=$(gcloud run services describe cra-worker --region="$REGION" --format="value(status.url)")
+
+if [ -z "$WORKER_URL" ]; then
+  echo "Error: Could not retrieve cra-worker URL. Deploy may have failed."
+  exit 1
+fi
+
+echo "Worker URL is: $WORKER_URL"
+
+for i in "${!SUBS[@]}"; do
+  SUB="${SUBS[$i]}"
+  TOPIC="${TOPICS[$i]}"
+  
+  # For the push endpoint, we append the topic name to match the Mux handlers
+  # EXCEPT for the topic "scan-requests", wait--
+  # In worker.go, the routes are:
+  # /pubsub/aggregator
+  # /pubsub/modeler
+  # /pubsub/validator
+  # /pubsub/reviewer
+  # /pubsub/tagger
+  # /pubsub/scan-requests
+  # Let's map TOPICS to endpoints manually or standardize them.
+  # The topics are: "scan-requests" "aggregator-tasks" "modeler-tasks" "validator-tasks" "reviewer-tasks" "tagger-tasks" "monitoring-events"
+  ENDPOINT_PATH=""
+  case "$TOPIC" in
+    "scan-requests") ENDPOINT_PATH="/pubsub/scan-requests" ;;
+    "aggregator-tasks") ENDPOINT_PATH="/pubsub/aggregator" ;;
+    "modeler-tasks") ENDPOINT_PATH="/pubsub/modeler" ;;
+    "validator-tasks") ENDPOINT_PATH="/pubsub/validator" ;;
+    "reviewer-tasks") ENDPOINT_PATH="/pubsub/reviewer" ;;
+    "tagger-tasks") ENDPOINT_PATH="/pubsub/tagger" ;;
+    "monitoring-events") 
+       # Monitoring is broadcast to SSE via the server, worker doesn't consume it.
+       # The Server actually consumed this in the previous Pull model!
+       # We should not create a worker Push sub for monitoring.
+       continue ;;
+  esac
+
+  PUSH_ENDPOINT="${WORKER_URL}${ENDPOINT_PATH}"
+
+  if ! gcloud pubsub subscriptions describe "$SUB" &>/dev/null; then
+    echo "Creating Pub/Sub Push subscription: $SUB attached to $TOPIC -> $PUSH_ENDPOINT"
+    gcloud pubsub subscriptions create "$SUB" --topic="$TOPIC" --push-endpoint="$PUSH_ENDPOINT"
+  else
+    echo "Updating Pub/Sub Push subscription: $SUB to $PUSH_ENDPOINT"
+    gcloud pubsub subscriptions update "$SUB" --push-endpoint="$PUSH_ENDPOINT"
+  fi
+done
+
+echo "Deployment complete! Event-Driven Push Services are active."

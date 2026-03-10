@@ -55,7 +55,7 @@ func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
 
 // CreateScan registers a new scan job so downstream workers can link their findings to it.
 func (s *CloudSQLStore) CreateScan(ctx context.Context, jobID, scope string) error {
-	_, err := s.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status) VALUES ($1, $2, $3)", jobID, scope, "running")
+	_, err := s.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status) VALUES ($1, $2, $3) ON CONFLICT (job_id) DO NOTHING", jobID, scope, "running")
 	return err
 }
 

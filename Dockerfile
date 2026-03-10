@@ -1,31 +1,11 @@
 # Use a multi-stage build for production efficiency
 
-# Stage 1: Build Frontend (Node.js) ---
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/web
-# Copy package.json and lock files
-COPY web/package.json web/package-lock.json* ./
-# Install dependencies
-RUN npm install
-# Copy source code
-COPY web/ .
-# Build Next.js app (static export)
-RUN npm run build
-
-# --- Stage 2: Build Backend (Go) ---
-FROM golang:1.25 AS backend-builder
-WORKDIR /app
-
 # Copy Go dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy source code
 COPY . .
-
-# Copy built frontend assets to the expected embed location
-# Note: Ensure cmd/server/out exists or is created
-COPY --from=frontend-builder /app/web/out ./cmd/server/out
 
 # Build arguments
 ARG TARGET=server

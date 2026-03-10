@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -18,8 +16,6 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
 )
 
-//go:embed all:out
-var staticFiles embed.FS
 
 func main() {
 	cfg := config.Load()
@@ -80,28 +76,20 @@ func main() {
 		}()
 	}
 
-	contentStatic, _ := fs.Sub(staticFiles, "out")
-
 	switch role {
 	case "worker":
 		if err := worker.Start(ctx, cfg, pubsubClient, storeClient); err != nil {
 			slog.Error("Worker failed", "error", err)
 			os.Exit(1)
 		}
-	case "server":
-		if err := server.Start(ctx, cfg, pubsubClient, storeClient, hub, contentStatic); err != nil {
+		if err := server.Start(ctx, cfg, pubsubClient, storeClient, hub); err != nil {
 			slog.Error("Server failed", "error", err)
 			os.Exit(1)
 		}
 	case "all":
 		errChan := make(chan error, 1)
 		go func() {
-			if err := worker.Start(ctx, cfg, pubsubClient, storeClient); err != nil {
-				errChan <- fmt.Errorf("worker error: %w", err)
-			}
-		}()
-		go func() {
-			if err := server.Start(ctx, cfg, pubsubClient, storeClient, hub, contentStatic); err != nil {
+			if err := server.Start(ctx, cfg, pubsubClient, storeClient, hub); err != nil {
 				errChan <- fmt.Errorf("server error: %w", err)
 			}
 		}()
