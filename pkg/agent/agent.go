@@ -160,19 +160,18 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("request failed: %w", err)
 		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				slog.Error("Failed to close response body", "error", err)
-			}
-		}()
 
 		if resp.StatusCode != http.StatusOK {
 			bodyBytes, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
 			return "", fmt.Errorf("api error (status %d): %s", resp.StatusCode, string(bodyBytes))
 		}
 
 		var respData map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&respData); err != nil {
+		err = json.NewDecoder(resp.Body).Decode(&respData)
+		_ = resp.Body.Close()
+		
+		if err != nil {
 			return "", fmt.Errorf("failed to decode response: %w", err)
 		}
 

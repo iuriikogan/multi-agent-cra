@@ -164,21 +164,44 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 	}
 
 	jsonStr := listResp
-	if start := strings.IndexAny(jsonStr, "[{"); start != -1 {
-		if end := strings.LastIndexAny(jsonStr, "}]"); end != -1 && end > start {
-			jsonStr = jsonStr[start : end+1]
-		}
-	}
-	jsonStr = strings.TrimSpace(jsonStr)
-
+	
 	type Asset struct {
 		Name      string `json:"name"`
 		AssetType string `json:"asset_type"`
 		Location  string `json:"location"`
 	}
 	var assets []Asset
-	if err := json.Unmarshal([]byte(jsonStr), &assets); err != nil {
-		return fmt.Errorf("failed to parse assets: %w", err)
+
+	parsed := false
+	if start := strings.Index(jsonStr, "["); start != -1 {
+		if end := strings.LastIndex(jsonStr, "]"); end != -1 && end > start {
+			arrayStr := jsonStr[start : end+1]
+			if err := json.Unmarshal([]byte(arrayStr), &assets); err == nil {
+				parsed = true
+			}
+		}
+	}
+
+	if !parsed {
+		jsonStr = strings.TrimSpace(jsonStr)
+		if err := json.Unmarshal([]byte(jsonStr), &assets); err != nil {
+			// If unmarshaling into a slice fails, try unmarshaling into a single object.
+			var singleAsset Asset
+			if err2 := json.Unmarshal([]byte(jsonStr), &singleAsset); err2 == nil {
+				assets = []Asset{singleAsset}
+			} else {
+				// If that also fails, try the wrapper object.
+				var wrapper struct {
+					Assets []Asset `json:"assets"`
+				}
+				if err3 := json.Unmarshal([]byte(jsonStr), &wrapper); err3 == nil && wrapper.Assets != nil {
+					assets = wrapper.Assets
+				} else {
+					// If all attempts fail, return the original error.
+					return fmt.Errorf("failed to parse assets: %w", err)
+				}
+			}
+		}
 	}
 
 	for i, a := range assets {

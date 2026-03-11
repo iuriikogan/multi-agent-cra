@@ -54,7 +54,7 @@ func (m *mockStore) GetScan(ctx context.Context, jobID string) (*store.ScanResul
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var f store.Finding
 		var detailsStr string

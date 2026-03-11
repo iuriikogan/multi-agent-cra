@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+set -ou -pipefail
 
 # --- Configuration ---
 PROJECT_ID=$(gcloud config get-value project)
@@ -15,12 +15,12 @@ echo "Using Project: $PROJECT_ID ($PROJECT_NUMBER)"
 echo "Using Region: $REGION"
 
 # --- Configuration Defaults ---
-MODEL_AGGREGATOR="gemini-3.1-flash-lite-preview"
-MODEL_MODELER="gemini-3-pro-preview"
-MODEL_VALIDATOR="gemini-3-pro-preview"
-MODEL_REVIEWER="gemini-3-pro-preview"
-MODEL_TAGGER="gemini-3.1-flash-lite-preview"
-MODEL_REPORTER="gemini-3-pro-preview"
+MODEL_AGGREGATOR="gemini-2.5-flash"
+MODEL_MODELER="gemini-2.5-pro"
+MODEL_VALIDATOR="gemini-2.5-pro"
+MODEL_REVIEWER="gemini-2.5-pro"
+MODEL_TAGGER="gemini-2.5-flash"
+MODEL_REPORTER="gemini-2.5-pro"
 DESTROY=0
 
 # --- Parse Arguments ---

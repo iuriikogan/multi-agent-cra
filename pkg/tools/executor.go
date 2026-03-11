@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"cloud.google.com/go/asset/apiv1"
@@ -92,8 +91,8 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 	}
 	client := e.AssetClient
 
-	req := &assetpb.ListAssetsRequest{
-		Parent:     scope,
+	req := &assetpb.SearchAllResourcesRequest{
+		Scope:      scope,
 		AssetTypes: []string{},
 	}
 
@@ -106,9 +105,8 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 		}
 	}
 
-	it := client.ListAssets(ctx, req)
+	it := client.SearchAllResources(ctx, req)
 	var result []map[string]interface{}
-	locationRegex := regexp.MustCompile(`/(locations|zones|regions)/([^/]+)`)
 
 	for {
 		asset, err := it.Next()
@@ -122,11 +120,7 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 		entry := map[string]interface{}{
 			"name":       asset.Name,
 			"asset_type": asset.AssetType,
-			"location":   "",
-		}
-		// Attempt to extract location from name
-		if match := locationRegex.FindStringSubmatch(asset.Name); len(match) == 3 {
-			entry["location"] = match[2]
+			"location":   asset.Location,
 		}
 		result = append(result, entry)
 	}
