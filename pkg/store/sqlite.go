@@ -70,7 +70,7 @@ func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 
 // CreateScan initializes tracking for a new workflow.
 func (s *SQLiteStore) CreateScan(ctx context.Context, jobID, scope string) error {
-	_, err := s.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status) VALUES (?, ?, ?)", jobID, scope, "running")
+	_, err := s.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status) VALUES (?, ?, ?) ON CONFLICT (job_id) DO NOTHING", jobID, scope, "running")
 	return err
 }
 

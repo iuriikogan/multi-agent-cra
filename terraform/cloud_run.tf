@@ -4,6 +4,7 @@ resource "google_cloud_run_v2_service" "server" {
   name     = var.cloud_run_server_name
   location = var.region
   provider = google-beta
+  deletion_protection = false
 
   template {
     scaling {
@@ -26,12 +27,16 @@ resource "google_cloud_run_v2_service" "server" {
         value = "server"
       }
       env {
+        name  = "PROJECT_ID"
+        value = var.project_id
+      }
+      env {
         name  = "DATABASE_TYPE"
         value = "CLOUD_SQL"
       }
       env {
         name = "DATABASE_URL"
-        value = "host=${google_sql_database_instance.main.private_ip_address} port=5432 user=${var.db_user} password=${var.db_password} dbname=${google_sql_database.main.name} sslmode=disable"
+        value = "host=${google_sql_database_instance.main.private_ip_address} port=5432 user=${var.db_user} password=${var.db_password} dbname=${google_sql_database.main.name} sslmode=require"
       }
       env {
         name = "GEMINI_API_KEY"
@@ -84,6 +89,14 @@ resource "google_cloud_run_v2_service" "worker" {
       env {
         name  = "PROJECT_ID"
         value = var.project_id
+      }
+      env {
+        name  = "DATABASE_TYPE"
+        value = "CLOUD_SQL"
+      }
+      env {
+        name = "DATABASE_URL"
+        value = "host=${google_sql_database_instance.main.private_ip_address} port=5432 user=${var.db_user} password=${var.db_password} dbname=${google_sql_database.main.name} sslmode=require"
       }
       env {
         name  = "LOG_LEVEL"

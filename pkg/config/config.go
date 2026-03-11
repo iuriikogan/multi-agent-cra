@@ -18,6 +18,18 @@ type Config struct {
 	StoreType     string
 	PubSub        PubSubConfig
 	Server        ServerConfig
+	Models        ModelsConfig
+}
+
+// ModelsConfig holds model names for each agent
+type ModelsConfig struct {
+	Aggregator     string
+	Modeler        string
+	Validator      string
+	Reviewer       string
+	Tagger         string
+	Reporter       string
+	VisualReporter string
 }
 
 // PubSubConfig holds topic and subscription mappings.
@@ -36,6 +48,8 @@ type PubSubConfig struct {
 	SubReviewer       string
 	TopicTagger       string
 	SubTagger         string
+	TopicReporter     string
+	SubReporter       string
 	TopicMonitoring   string
 	SubMonitoring     string
 }
@@ -72,11 +86,22 @@ func Load() *Config {
 			SubReviewer:       getEnv("PUBSUB_SUB_REVIEWER", "reviewer-tasks-sub"),
 			TopicTagger:       getEnv("PUBSUB_TOPIC_TAGGER", "tagger-tasks"),
 			SubTagger:         getEnv("PUBSUB_SUB_TAGGER", "tagger-tasks-sub"),
+			TopicReporter:     getEnv("PUBSUB_TOPIC_REPORTER", "reporter-tasks"),
+			SubReporter:       getEnv("PUBSUB_SUB_REPORTER", "reporter-tasks-sub"),
 			TopicMonitoring:   getEnv("PUBSUB_TOPIC_MONITORING", "monitoring-events"),
 			SubMonitoring:     getEnv("PUBSUB_SUB_MONITORING", "monitoring-events-sub"),
 		},
 		Server: ServerConfig{
 			Port: getEnv("PORT", "8080"),
+		},
+		Models: ModelsConfig{
+			Aggregator:     getEnv("MODEL_AGGREGATOR", "gemini-3.1-flash-lite-preview"),
+			Modeler:        getEnv("MODEL_MODELER", "gemini-3-pro-preview"),
+			Validator:      getEnv("MODEL_VALIDATOR", "gemini-3-pro-preview"),
+			Reviewer:       getEnv("MODEL_REVIEWER", "gemini-3-pro-preview"),
+			Tagger:         getEnv("MODEL_TAGGER", "gemini-3.1-flash-lite-preview"),
+			Reporter:       getEnv("MODEL_REPORTER", "gemini-3.1-flash-lite-preview"),
+			VisualReporter: getEnv("MODEL_REPORTER", "gemini-3-pro-preview"),
 		},
 	}
 }

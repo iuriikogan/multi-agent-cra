@@ -1,0 +1,219 @@
+digraph {
+	compound = "true"
+	newrank = "true"
+	subgraph "root" {
+		"[root] data.google_client_config.default (expand)" [label = "data.google_client_config.default", shape = "box"]
+		"[root] data.google_project.project (expand)" [label = "data.google_project.project", shape = "box"]
+		"[root] data.google_project.project_registry (expand)" [label = "data.google_project.project_registry", shape = "box"]
+		"[root] data.http.myip (expand)" [label = "data.http.myip", shape = "box"]
+		"[root] google_artifact_registry_repository.cra_repo (expand)" [label = "google_artifact_registry_repository.cra_repo", shape = "box"]
+		"[root] google_artifact_registry_repository_iam_member.cloudbuild_sa_writer (expand)" [label = "google_artifact_registry_repository_iam_member.cloudbuild_sa_writer", shape = "box"]
+		"[root] google_cloud_run_v2_service.server (expand)" [label = "google_cloud_run_v2_service.server", shape = "box"]
+		"[root] google_cloud_run_v2_service.worker (expand)" [label = "google_cloud_run_v2_service.worker", shape = "box"]
+		"[root] google_compute_backend_service.default (expand)" [label = "google_compute_backend_service.default", shape = "box"]
+		"[root] google_compute_global_address.default (expand)" [label = "google_compute_global_address.default", shape = "box"]
+		"[root] google_compute_global_address.private_ip_address (expand)" [label = "google_compute_global_address.private_ip_address", shape = "box"]
+		"[root] google_compute_global_forwarding_rule.default (expand)" [label = "google_compute_global_forwarding_rule.default", shape = "box"]
+		"[root] google_compute_network.vpc (expand)" [label = "google_compute_network.vpc", shape = "box"]
+		"[root] google_compute_region_network_endpoint_group.serverless_neg (expand)" [label = "google_compute_region_network_endpoint_group.serverless_neg", shape = "box"]
+		"[root] google_compute_security_policy.agent_armor (expand)" [label = "google_compute_security_policy.agent_armor", shape = "box"]
+		"[root] google_compute_security_policy.policy (expand)" [label = "google_compute_security_policy.policy", shape = "box"]
+		"[root] google_compute_subnetwork.default (expand)" [label = "google_compute_subnetwork.default", shape = "box"]
+		"[root] google_compute_target_http_proxy.default (expand)" [label = "google_compute_target_http_proxy.default", shape = "box"]
+		"[root] google_compute_url_map.default (expand)" [label = "google_compute_url_map.default", shape = "box"]
+		"[root] google_kms_crypto_key.secret_key (expand)" [label = "google_kms_crypto_key.secret_key", shape = "box"]
+		"[root] google_kms_crypto_key_iam_member.sm_sa_encrypter_decrypter (expand)" [label = "google_kms_crypto_key_iam_member.sm_sa_encrypter_decrypter", shape = "box"]
+		"[root] google_kms_key_ring.key_ring (expand)" [label = "google_kms_key_ring.key_ring", shape = "box"]
+		"[root] google_project_iam_member.auditor_vertex (expand)" [label = "google_project_iam_member.auditor_vertex", shape = "box"]
+		"[root] google_project_iam_member.classifier_vertex (expand)" [label = "google_project_iam_member.classifier_vertex", shape = "box"]
+		"[root] google_project_iam_member.cloudbuild_sa_logging (expand)" [label = "google_project_iam_member.cloudbuild_sa_logging", shape = "box"]
+		"[root] google_project_iam_member.reporter_vertex (expand)" [label = "google_project_iam_member.reporter_vertex", shape = "box"]
+		"[root] google_project_iam_member.vuln_vertex (expand)" [label = "google_project_iam_member.vuln_vertex", shape = "box"]
+		"[root] google_project_service.apis (expand)" [label = "google_project_service.apis", shape = "box"]
+		"[root] google_project_service.artifactregistry (expand)" [label = "google_project_service.artifactregistry", shape = "box"]
+		"[root] google_project_service.cloudkms (expand)" [label = "google_project_service.cloudkms", shape = "box"]
+		"[root] google_project_service.secretmanager (expand)" [label = "google_project_service.secretmanager", shape = "box"]
+		"[root] google_project_service_identity.secretmanager_agent (expand)" [label = "google_project_service_identity.secretmanager_agent", shape = "box"]
+		"[root] google_pubsub_subscription.assets_found_sub (expand)" [label = "google_pubsub_subscription.assets_found_sub", shape = "box"]
+		"[root] google_pubsub_subscription.final_reports_sub (expand)" [label = "google_pubsub_subscription.final_reports_sub", shape = "box"]
+		"[root] google_pubsub_subscription.models_generated_sub (expand)" [label = "google_pubsub_subscription.models_generated_sub", shape = "box"]
+		"[root] google_pubsub_subscription.scan_requests_sub (expand)" [label = "google_pubsub_subscription.scan_requests_sub", shape = "box"]
+		"[root] google_pubsub_subscription.validation_results_sub (expand)" [label = "google_pubsub_subscription.validation_results_sub", shape = "box"]
+		"[root] google_pubsub_topic.assets_found (expand)" [label = "google_pubsub_topic.assets_found", shape = "box"]
+		"[root] google_pubsub_topic.final_reports (expand)" [label = "google_pubsub_topic.final_reports", shape = "box"]
+		"[root] google_pubsub_topic.models_generated (expand)" [label = "google_pubsub_topic.models_generated", shape = "box"]
+		"[root] google_pubsub_topic.scan_requests (expand)" [label = "google_pubsub_topic.scan_requests", shape = "box"]
+		"[root] google_pubsub_topic.validation_results (expand)" [label = "google_pubsub_topic.validation_results", shape = "box"]
+		"[root] google_secret_manager_secret.gemini_api_key (expand)" [label = "google_secret_manager_secret.gemini_api_key", shape = "box"]
+		"[root] google_secret_manager_secret_iam_member.auditor_access (expand)" [label = "google_secret_manager_secret_iam_member.auditor_access", shape = "box"]
+		"[root] google_secret_manager_secret_iam_member.classifier_access (expand)" [label = "google_secret_manager_secret_iam_member.classifier_access", shape = "box"]
+		"[root] google_secret_manager_secret_iam_member.compute_sa_access (expand)" [label = "google_secret_manager_secret_iam_member.compute_sa_access", shape = "box"]
+		"[root] google_secret_manager_secret_iam_member.reporter_access (expand)" [label = "google_secret_manager_secret_iam_member.reporter_access", shape = "box"]
+		"[root] google_secret_manager_secret_iam_member.vuln_access (expand)" [label = "google_secret_manager_secret_iam_member.vuln_access", shape = "box"]
+		"[root] google_secret_manager_secret_version.gemini_api_key_version (expand)" [label = "google_secret_manager_secret_version.gemini_api_key_version", shape = "box"]
+		"[root] google_service_account.sa_auditor (expand)" [label = "google_service_account.sa_auditor", shape = "box"]
+		"[root] google_service_account.sa_classifier (expand)" [label = "google_service_account.sa_classifier", shape = "box"]
+		"[root] google_service_account.sa_reporter (expand)" [label = "google_service_account.sa_reporter", shape = "box"]
+		"[root] google_service_account.sa_vuln (expand)" [label = "google_service_account.sa_vuln", shape = "box"]
+		"[root] google_service_account_iam_member.wi_auditor (expand)" [label = "google_service_account_iam_member.wi_auditor", shape = "box"]
+		"[root] google_service_account_iam_member.wi_classifier (expand)" [label = "google_service_account_iam_member.wi_classifier", shape = "box"]
+		"[root] google_service_account_iam_member.wi_reporter (expand)" [label = "google_service_account_iam_member.wi_reporter", shape = "box"]
+		"[root] google_service_account_iam_member.wi_vuln (expand)" [label = "google_service_account_iam_member.wi_vuln", shape = "box"]
+		"[root] google_service_networking_connection.private_vpc_connection (expand)" [label = "google_service_networking_connection.private_vpc_connection", shape = "box"]
+		"[root] google_sql_database.main (expand)" [label = "google_sql_database.main", shape = "box"]
+		"[root] google_sql_database_instance.main (expand)" [label = "google_sql_database_instance.main", shape = "box"]
+		"[root] google_sql_user.main (expand)" [label = "google_sql_user.main", shape = "box"]
+		"[root] google_vpc_access_connector.serverless (expand)" [label = "google_vpc_access_connector.serverless", shape = "box"]
+		"[root] provider[\"registry.terraform.io/hashicorp/google-beta\"]" [label = "provider[\"registry.terraform.io/hashicorp/google-beta\"]", shape = "diamond"]
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"]" [label = "provider[\"registry.terraform.io/hashicorp/google\"]", shape = "diamond"]
+		"[root] provider[\"registry.terraform.io/hashicorp/http\"]" [label = "provider[\"registry.terraform.io/hashicorp/http\"]", shape = "diamond"]
+		"[root] var.cloud_run_server_name" [label = "var.cloud_run_server_name", shape = "note"]
+		"[root] var.cloud_run_worker_name" [label = "var.cloud_run_worker_name", shape = "note"]
+		"[root] var.db_password" [label = "var.db_password", shape = "note"]
+		"[root] var.db_tier" [label = "var.db_tier", shape = "note"]
+		"[root] var.db_user" [label = "var.db_user", shape = "note"]
+		"[root] var.db_version" [label = "var.db_version", shape = "note"]
+		"[root] var.gcs_bucket_name" [label = "var.gcs_bucket_name", shape = "note"]
+		"[root] var.gemini_api_key" [label = "var.gemini_api_key", shape = "note"]
+		"[root] var.image_repository" [label = "var.image_repository", shape = "note"]
+		"[root] var.project_id" [label = "var.project_id", shape = "note"]
+		"[root] var.region" [label = "var.region", shape = "note"]
+		"[root] data.google_client_config.default (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] data.google_project.project (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] data.google_project.project_registry (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] data.http.myip (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/http\"]"
+		"[root] google_artifact_registry_repository.cra_repo (expand)" -> "[root] google_project_service.artifactregistry (expand)"
+		"[root] google_artifact_registry_repository_iam_member.cloudbuild_sa_writer (expand)" -> "[root] data.google_project.project_registry (expand)"
+		"[root] google_artifact_registry_repository_iam_member.cloudbuild_sa_writer (expand)" -> "[root] google_artifact_registry_repository.cra_repo (expand)"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] google_secret_manager_secret_iam_member.compute_sa_access (expand)"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] google_secret_manager_secret_version.gemini_api_key_version (expand)"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] google_sql_database.main (expand)"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] google_vpc_access_connector.serverless (expand)"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] var.cloud_run_server_name"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] var.db_password"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] var.db_user"
+		"[root] google_cloud_run_v2_service.server (expand)" -> "[root] var.image_repository"
+		"[root] google_cloud_run_v2_service.worker (expand)" -> "[root] google_secret_manager_secret_iam_member.compute_sa_access (expand)"
+		"[root] google_cloud_run_v2_service.worker (expand)" -> "[root] google_secret_manager_secret_version.gemini_api_key_version (expand)"
+		"[root] google_cloud_run_v2_service.worker (expand)" -> "[root] google_sql_database_instance.main (expand)"
+		"[root] google_cloud_run_v2_service.worker (expand)" -> "[root] google_vpc_access_connector.serverless (expand)"
+		"[root] google_cloud_run_v2_service.worker (expand)" -> "[root] var.cloud_run_worker_name"
+		"[root] google_cloud_run_v2_service.worker (expand)" -> "[root] var.image_repository"
+		"[root] google_compute_backend_service.default (expand)" -> "[root] google_compute_region_network_endpoint_group.serverless_neg (expand)"
+		"[root] google_compute_backend_service.default (expand)" -> "[root] google_compute_security_policy.policy (expand)"
+		"[root] google_compute_global_address.default (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_compute_global_address.private_ip_address (expand)" -> "[root] google_compute_network.vpc (expand)"
+		"[root] google_compute_global_forwarding_rule.default (expand)" -> "[root] google_compute_global_address.default (expand)"
+		"[root] google_compute_global_forwarding_rule.default (expand)" -> "[root] google_compute_target_http_proxy.default (expand)"
+		"[root] google_compute_network.vpc (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_compute_region_network_endpoint_group.serverless_neg (expand)" -> "[root] google_cloud_run_v2_service.server (expand)"
+		"[root] google_compute_security_policy.agent_armor (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_compute_security_policy.policy (expand)" -> "[root] data.http.myip (expand)"
+		"[root] google_compute_security_policy.policy (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_compute_subnetwork.default (expand)" -> "[root] google_compute_network.vpc (expand)"
+		"[root] google_compute_target_http_proxy.default (expand)" -> "[root] google_compute_url_map.default (expand)"
+		"[root] google_compute_url_map.default (expand)" -> "[root] google_compute_backend_service.default (expand)"
+		"[root] google_kms_crypto_key.secret_key (expand)" -> "[root] google_kms_key_ring.key_ring (expand)"
+		"[root] google_kms_crypto_key_iam_member.sm_sa_encrypter_decrypter (expand)" -> "[root] google_kms_crypto_key.secret_key (expand)"
+		"[root] google_kms_crypto_key_iam_member.sm_sa_encrypter_decrypter (expand)" -> "[root] google_project_service_identity.secretmanager_agent (expand)"
+		"[root] google_kms_key_ring.key_ring (expand)" -> "[root] google_project_service.cloudkms (expand)"
+		"[root] google_project_iam_member.auditor_vertex (expand)" -> "[root] google_service_account.sa_auditor (expand)"
+		"[root] google_project_iam_member.classifier_vertex (expand)" -> "[root] google_service_account.sa_classifier (expand)"
+		"[root] google_project_iam_member.cloudbuild_sa_logging (expand)" -> "[root] data.google_project.project_registry (expand)"
+		"[root] google_project_iam_member.reporter_vertex (expand)" -> "[root] google_service_account.sa_reporter (expand)"
+		"[root] google_project_iam_member.vuln_vertex (expand)" -> "[root] google_service_account.sa_vuln (expand)"
+		"[root] google_project_service.apis (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_project_service.artifactregistry (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_project_service.cloudkms (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_project_service.secretmanager (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_project_service_identity.secretmanager_agent (expand)" -> "[root] data.google_project.project (expand)"
+		"[root] google_project_service_identity.secretmanager_agent (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google-beta\"]"
+		"[root] google_pubsub_subscription.assets_found_sub (expand)" -> "[root] google_pubsub_topic.assets_found (expand)"
+		"[root] google_pubsub_subscription.final_reports_sub (expand)" -> "[root] google_pubsub_topic.final_reports (expand)"
+		"[root] google_pubsub_subscription.models_generated_sub (expand)" -> "[root] google_pubsub_topic.models_generated (expand)"
+		"[root] google_pubsub_subscription.scan_requests_sub (expand)" -> "[root] google_pubsub_topic.scan_requests (expand)"
+		"[root] google_pubsub_subscription.validation_results_sub (expand)" -> "[root] google_pubsub_topic.validation_results (expand)"
+		"[root] google_pubsub_topic.assets_found (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_pubsub_topic.final_reports (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_pubsub_topic.models_generated (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_pubsub_topic.scan_requests (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_pubsub_topic.validation_results (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_secret_manager_secret.gemini_api_key (expand)" -> "[root] google_kms_crypto_key_iam_member.sm_sa_encrypter_decrypter (expand)"
+		"[root] google_secret_manager_secret_iam_member.auditor_access (expand)" -> "[root] google_secret_manager_secret.gemini_api_key (expand)"
+		"[root] google_secret_manager_secret_iam_member.auditor_access (expand)" -> "[root] google_service_account.sa_auditor (expand)"
+		"[root] google_secret_manager_secret_iam_member.classifier_access (expand)" -> "[root] google_secret_manager_secret.gemini_api_key (expand)"
+		"[root] google_secret_manager_secret_iam_member.classifier_access (expand)" -> "[root] google_service_account.sa_classifier (expand)"
+		"[root] google_secret_manager_secret_iam_member.compute_sa_access (expand)" -> "[root] google_secret_manager_secret.gemini_api_key (expand)"
+		"[root] google_secret_manager_secret_iam_member.reporter_access (expand)" -> "[root] google_secret_manager_secret.gemini_api_key (expand)"
+		"[root] google_secret_manager_secret_iam_member.reporter_access (expand)" -> "[root] google_service_account.sa_reporter (expand)"
+		"[root] google_secret_manager_secret_iam_member.vuln_access (expand)" -> "[root] google_secret_manager_secret.gemini_api_key (expand)"
+		"[root] google_secret_manager_secret_iam_member.vuln_access (expand)" -> "[root] google_service_account.sa_vuln (expand)"
+		"[root] google_secret_manager_secret_version.gemini_api_key_version (expand)" -> "[root] google_secret_manager_secret.gemini_api_key (expand)"
+		"[root] google_secret_manager_secret_version.gemini_api_key_version (expand)" -> "[root] var.gemini_api_key"
+		"[root] google_service_account.sa_auditor (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_service_account.sa_classifier (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_service_account.sa_reporter (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_service_account.sa_vuln (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"]"
+		"[root] google_service_account_iam_member.wi_auditor (expand)" -> "[root] google_service_account.sa_auditor (expand)"
+		"[root] google_service_account_iam_member.wi_classifier (expand)" -> "[root] google_service_account.sa_classifier (expand)"
+		"[root] google_service_account_iam_member.wi_reporter (expand)" -> "[root] google_service_account.sa_reporter (expand)"
+		"[root] google_service_account_iam_member.wi_vuln (expand)" -> "[root] google_service_account.sa_vuln (expand)"
+		"[root] google_service_networking_connection.private_vpc_connection (expand)" -> "[root] google_compute_global_address.private_ip_address (expand)"
+		"[root] google_sql_database.main (expand)" -> "[root] google_sql_database_instance.main (expand)"
+		"[root] google_sql_database_instance.main (expand)" -> "[root] google_project_service.apis (expand)"
+		"[root] google_sql_database_instance.main (expand)" -> "[root] google_service_networking_connection.private_vpc_connection (expand)"
+		"[root] google_sql_database_instance.main (expand)" -> "[root] var.db_tier"
+		"[root] google_sql_database_instance.main (expand)" -> "[root] var.db_version"
+		"[root] google_sql_user.main (expand)" -> "[root] google_sql_database_instance.main (expand)"
+		"[root] google_sql_user.main (expand)" -> "[root] var.db_password"
+		"[root] google_sql_user.main (expand)" -> "[root] var.db_user"
+		"[root] google_vpc_access_connector.serverless (expand)" -> "[root] google_compute_network.vpc (expand)"
+		"[root] google_vpc_access_connector.serverless (expand)" -> "[root] google_project_service.apis (expand)"
+		"[root] output.artifact_registry_repo (expand)" -> "[root] google_artifact_registry_repository.cra_repo (expand)"
+		"[root] output.dashboard_public_url (expand)" -> "[root] google_compute_global_address.default (expand)"
+		"[root] output.project_id (expand)" -> "[root] var.project_id"
+		"[root] output.pubsub_scan_topic (expand)" -> "[root] google_pubsub_topic.scan_requests (expand)"
+		"[root] output.region (expand)" -> "[root] var.region"
+		"[root] provider[\"registry.terraform.io/hashicorp/google-beta\"] (close)" -> "[root] google_cloud_run_v2_service.server (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google-beta\"] (close)" -> "[root] google_cloud_run_v2_service.worker (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google-beta\"]" -> "[root] var.project_id"
+		"[root] provider[\"registry.terraform.io/hashicorp/google-beta\"]" -> "[root] var.region"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] data.google_client_config.default (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_artifact_registry_repository_iam_member.cloudbuild_sa_writer (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_compute_global_forwarding_rule.default (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_compute_security_policy.agent_armor (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_compute_subnetwork.default (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_project_iam_member.auditor_vertex (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_project_iam_member.classifier_vertex (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_project_iam_member.cloudbuild_sa_logging (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_project_iam_member.reporter_vertex (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_project_iam_member.vuln_vertex (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_project_service.secretmanager (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_pubsub_subscription.assets_found_sub (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_pubsub_subscription.final_reports_sub (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_pubsub_subscription.models_generated_sub (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_pubsub_subscription.scan_requests_sub (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_pubsub_subscription.validation_results_sub (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_secret_manager_secret_iam_member.auditor_access (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_secret_manager_secret_iam_member.classifier_access (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_secret_manager_secret_iam_member.reporter_access (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_secret_manager_secret_iam_member.vuln_access (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_service_account_iam_member.wi_auditor (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_service_account_iam_member.wi_classifier (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_service_account_iam_member.wi_reporter (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_service_account_iam_member.wi_vuln (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)" -> "[root] google_sql_user.main (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"]" -> "[root] var.project_id"
+		"[root] provider[\"registry.terraform.io/hashicorp/google\"]" -> "[root] var.region"
+		"[root] provider[\"registry.terraform.io/hashicorp/http\"] (close)" -> "[root] data.http.myip (expand)"
+		"[root] root" -> "[root] output.artifact_registry_repo (expand)"
+		"[root] root" -> "[root] output.dashboard_public_url (expand)"
+		"[root] root" -> "[root] output.project_id (expand)"
+		"[root] root" -> "[root] output.pubsub_scan_topic (expand)"
+		"[root] root" -> "[root] output.region (expand)"
+		"[root] root" -> "[root] provider[\"registry.terraform.io/hashicorp/google-beta\"] (close)"
+		"[root] root" -> "[root] provider[\"registry.terraform.io/hashicorp/google\"] (close)"
+		"[root] root" -> "[root] provider[\"registry.terraform.io/hashicorp/http\"] (close)"
+		"[root] root" -> "[root] var.gcs_bucket_name"
+	}
+}

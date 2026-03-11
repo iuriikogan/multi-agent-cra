@@ -1,0 +1,107 @@
+package batch
+
+import (
+	"context"
+	"encoding/csv"
+	"fmt"
+	"log/slog"
+	"os"
+	"strings"
+
+	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
+	"github.com/iuriikogan/multi-agent-cra/pkg/core"
+)
+
+// GenerateCSV creates a CSV report from the assessment results.
+func GenerateCSV(results []core.AssessmentResult) {
+	file, err := os.Create("compliance_report.csv")
+	if err != nil {
+		slog.Error("Failed to create CSV", "error", err)
+		return
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.Error("Failed to close CSV file", "error", err)
+		}
+	}()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	if err := writer.Write([]string{"ResourceID", "Name", "Type", "ComplianceStatus", "Tags"}); err != nil {
+		slog.Error("Failed to write CSV header", "error", err)
+		return
+	}
+	for _, r := range results {
+		status := "Compliant"
+		if strings.Contains(r.ComplianceReport, "NON-COMPLIANT") || strings.Contains(r.ComplianceReport, "High Risk") {
+			status = "Non-Compliant"
+		}
+		if err := writer.Write([]string{r.ResourceID, r.ResourceName, r.ResourceType, status, r.Tags}); err != nil {
+			slog.Error("Failed to write CSV record", "error", err)
+		}
+	}
+	slog.Info("CSV Report generated", "file", "compliance_report.csv")
+}
+
+// GenerateTaggingInstructions prints out CLI instructions for tagging.
+func GenerateTaggingInstructions(results []core.AssessmentResult) {
+	fmt.Println("\n--- 🏷️  Resource Tagging Validation & CLI Instructions ---")
+
+	seenTags := make(map[string]bool)
+
+	for _, r := range results {
+		if strings.Contains(r.Tags, "APPLIED_TAGS:") {
+			parts := strings.Split(r.Tags, "APPLIED_TAGS:")
+			if len(parts) > 1 {
+				tagStr := strings.TrimSpace(parts[1])
+				tags := strings.Split(tagStr, ",")
+
+				for _, t := range tags {
+					kv := strings.Split(strings.TrimSpace(t), "=")
+					if len(kv) == 2 {
+						k := strings.TrimSpace(kv[0])
+						v := strings.TrimSpace(kv[1])
+						tagKey := fmt.Sprintf("%s=%s", k, v)
+
+						if !seenTags[tagKey] {
+							seenTags[tagKey] = true
+							fmt.Printf("\nFound Tag: %s=%s\n", k, v)
+							fmt.Println("To find all resources with this label:")
+							fmt.Printf("  gcloud asset search-all-resources --query=\"labels.%s:%s\"\n", k, v)
+							fmt.Println("To filter instances:")
+							fmt.Printf("  gcloud compute instances list --filter=\"labels.%s=%s\"\n", k, v)
+						}
+					}
+				}
+			}
+		}
+	}
+	fmt.Println("\n------------------------------------------------------")
+}
+
+// GenerateVisualReport prompts the visual reporter agent to generate a dashboard image.
+func GenerateVisualReport(ctx context.Context, reporter agent.Agent, results []core.AssessmentResult) {
+	slog.Info("Generating Visual Report...")
+
+	compliantCount := 0
+	nonCompliantCount := 0
+	for _, r := range results {
+		if strings.Contains(r.ComplianceReport, "NON-COMPLIANT") || strings.Contains(r.ComplianceReport, "High Risk") {
+			nonCompliantCount++
+		} else {
+			compliantCount++
+		}
+	}
+
+	prompt := fmt.Sprintf("Generate a compliance dashboard for %d resources. Data: %d Compliant, %d Non-Compliant. Filename: compliance_dashboard.png. Theme: Cyber Resilience Act (CRA) futuristic security dashboard.",
+		len(results), compliantCount, nonCompliantCount)
+
+	resp, err := reporter.Chat(ctx, prompt)
+	if err != nil {
+		slog.Error("Visual reporting agent failed", "error", err)
+		return
+	}
+
+	slog.Info("Visual Reporter Agent Output", "response", resp)
+}

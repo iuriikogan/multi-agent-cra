@@ -1,12 +1,12 @@
 #!/bin/bash
-set -e
+set -x
 
 # --- Configuration ---
 PROJECT_ID=$(gcloud config get-value project)
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 # Use region from gcloud config or default to us-central1
 REGION=$(gcloud config get-value compute/region 2>/dev/null)
-REGION=${REGION:-europe-west-1}
+REGION=${REGION:-europe-west1}
 REPO_NAME="multi-agent-cra"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 BUCKET_NAME="cra-data-${PROJECT_ID}"
@@ -14,18 +14,56 @@ BUCKET_NAME="cra-data-${PROJECT_ID}"
 echo "Using Project: $PROJECT_ID ($PROJECT_NUMBER)"
 echo "Using Region: $REGION"
 
+# --- Configuration Defaults ---
+MODEL_AGGREGATOR="gemini-3.1-flash-lite-preview"
+MODEL_MODELER="gemini-3-pro-preview"
+MODEL_VALIDATOR="gemini-3-pro-preview"
+MODEL_REVIEWER="gemini-3-pro-preview"
+MODEL_TAGGER="gemini-3.1-flash-lite-preview"
+MODEL_REPORTER="gemini-3-pro-preview"
+DESTROY=0
+
+# --- Parse Arguments ---
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    --destroy|-d) DESTROY=1; shift ;;
+    --model-aggregator=*) MODEL_AGGREGATOR="${1#*=}"; shift ;;
+    --model-aggregator) MODEL_AGGREGATOR="$2"; shift 2 ;;
+    --model-modeler=*) MODEL_MODELER="${1#*=}"; shift ;;
+    --model-modeler) MODEL_MODELER="$2"; shift 2 ;;
+    --model-validator=*) MODEL_VALIDATOR="${1#*=}"; shift ;;
+    --model-validator) MODEL_VALIDATOR="$2"; shift 2 ;;
+    --model-reviewer=*) MODEL_REVIEWER="${1#*=}"; shift ;;
+    --model-reviewer) MODEL_REVIEWER="$2"; shift 2 ;;
+    --model-tagger=*) MODEL_TAGGER="${1#*=}"; shift ;;
+    --model-tagger) MODEL_TAGGER="$2"; shift 2 ;;
+    --model-reporter=*) MODEL_REPORTER="${1#*=}"; shift ;;
+    --model-reporter) MODEL_REPORTER="$2"; shift 2 ;;
+    *) echo "Unknown parameter: $1"; exit 1 ;;
+  esac
+done
+
 # --- Handle Destroy Flag ---
-if [[ "$1" == "--destroy" || "$1" == "-d" ]]; then
+if [[ "$DESTROY" == "1" ]]; then
   echo "Destroy flag detected. Tearing down resources..."
 
   echo "Deleting Cloud Run services..."
   gcloud run services delete cra-server --region="$REGION" --quiet || true
   gcloud run services delete cra-worker --region="$REGION" --quiet || true
+  gcloud run services delete cra-dashboard --region="$REGION" --quiet || true
 
-  echo "Deleting Pub/Sub subscription and topic..."
-  gcloud pubsub subscriptions delete scan-requests-sub --quiet || true
-  gcloud pubsub topics delete scan-requests --quiet || true
+  echo "Deleting Pub/Sub subscriptions and topics..."
+  SUBS=("scan-requests-sub" "aggregator-tasks-sub" "modeler-tasks-sub" "validator-tasks-sub" "reviewer-tasks-sub" "tagger-tasks-sub" "monitoring-events-sub")
+  TOPICS=("scan-requests" "aggregator-tasks" "modeler-tasks" "validator-tasks" "reviewer-tasks" "tagger-tasks" "monitoring-events")
+  
+  for SUB in "${SUBS[@]}"; do
+    gcloud pubsub subscriptions delete "$SUB" --quiet || true
+  done
 
+  for TOPIC in "${TOPICS[@]}"; do
+    gcloud pubsub topics delete "$TOPIC" --quiet || true
+  done
+  
   echo "Deleting GCS Bucket..."
   gcloud storage rm -r "gs://${BUCKET_NAME}" --quiet || true
 
@@ -90,7 +128,7 @@ if ! gcloud storage buckets describe "gs://${BUCKET_NAME}" &>/dev/null; then
 else
   echo "GCS Bucket ${BUCKET_NAME} already exists."
 fi
-
+sleep 10
 # Grant Object Admin to Compute SA
 echo "Granting Storage Object Admin to Compute SA..."
 gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
@@ -99,19 +137,17 @@ gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
   --quiet
 
 # --- 5. Setup Pub/Sub ---
-if ! gcloud pubsub topics describe scan-requests &>/dev/null; then
-  echo "Creating Pub/Sub topic: scan-requests..."
-  gcloud pubsub topics create scan-requests
-else
-  echo "Pub/Sub topic 'scan-requests' already exists."
-fi
+TOPICS=("scan-requests" "aggregator-tasks" "modeler-tasks" "validator-tasks" "reviewer-tasks" "tagger-tasks" "monitoring-events")
+SUBS=("scan-requests-sub" "aggregator-tasks-sub" "modeler-tasks-sub" "validator-tasks-sub" "reviewer-tasks-sub" "tagger-tasks-sub" "monitoring-events-sub")
 
-if ! gcloud pubsub subscriptions describe scan-requests-sub &>/dev/null; then
-  echo "Creating Pub/Sub subscription: scan-requests-sub..."
-  gcloud pubsub subscriptions create scan-requests-sub --topic=scan-requests
-else
-  echo "Pub/Sub subscription 'scan-requests-sub' already exists."
-fi
+for TOPIC in "${TOPICS[@]}"; do
+  if ! gcloud pubsub topics describe "$TOPIC" &>/dev/null; then
+    echo "Creating Pub/Sub topic: $TOPIC..."
+    gcloud pubsub topics create "$TOPIC"
+  else
+    echo "Pub/Sub topic '$TOPIC' already exists."
+  fi
+done
 
 # --- 6. Fix Cloud Build Permissions (Artifact Registry & Logging) ---
 # The default compute SA needs writer access to AR and log writer access
@@ -128,6 +164,12 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/logging.logWriter" \
   --quiet
 
+echo "Granting Storage Admin role to Compute SA (required to access Cloud Build source bucket)..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$COMPUTE_SA" \
+  --role="roles/storage.admin" \
+  --quiet
+
 echo "Granting Cloud Run Admin role to Compute SA..."
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$COMPUTE_SA" \
@@ -138,6 +180,12 @@ echo "Granting Service Account User role to Compute SA (required to deploy as it
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$COMPUTE_SA" \
   --role="roles/iam.serviceAccountUser" \
+  --quiet
+
+echo "Granting Cloud Run Invoker role to Compute SA (required for authenticated Pub/Sub push)..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$COMPUTE_SA" \
+  --role="roles/run.invoker" \
   --quiet
 
 echo "Granting Pub/Sub Publisher and Subscriber roles to Compute SA..."
@@ -151,6 +199,72 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/pubsub.subscriber" \
   --quiet
 
+echo "Granting Cloud Asset Viewer role to Compute SA (required for list_gcp_assets tool)..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$COMPUTE_SA" \
+  --role="roles/cloudasset.viewer" \
+  --quiet
+
 # --- 7. Trigger Cloud Build ---
-echo "Starting Cloud Build..."
-gcloud builds submit --config=cloudbuild.yaml .
+echo "Starting Cloud Build to build and deploy services..."
+gcloud builds submit --config=cloudbuild.yaml \
+  --substitutions=_REGION="$REGION",_MODEL_AGGREGATOR="$MODEL_AGGREGATOR",_MODEL_MODELER="$MODEL_MODELER",_MODEL_VALIDATOR="$MODEL_VALIDATOR",_MODEL_REVIEWER="$MODEL_REVIEWER",_MODEL_TAGGER="$MODEL_TAGGER",_MODEL_REPORTER="$MODEL_REPORTER" .
+
+# --- 8. Setup Pub/Sub Push Subscriptions ---
+echo "Getting Worker Service URL..."
+WORKER_URL=$(gcloud run services describe cra-worker --region="$REGION" --format="value(status.url)")
+
+if [ -z "$WORKER_URL" ]; then
+  echo "Error: Could not retrieve cra-worker URL. Deploy may have failed."
+  exit 1
+fi
+
+echo "Worker URL is: $WORKER_URL"
+
+for i in "${!SUBS[@]}"; do
+  SUB="${SUBS[$i]}"
+  TOPIC="${TOPICS[$i]}"
+  
+  # For the push endpoint, we append the topic name to match the Mux handlers
+  # EXCEPT for the topic "scan-requests", wait--
+  # In worker.go, the routes are:
+  # /pubsub/aggregator
+  # /pubsub/modeler
+  # /pubsub/validator
+  # /pubsub/reviewer
+  # /pubsub/tagger
+  # /pubsub/scan-requests
+  # Let's map TOPICS to endpoints manually or standardize them.
+  # The topics are: "scan-requests" "aggregator-tasks" "modeler-tasks" "validator-tasks" "reviewer-tasks" "tagger-tasks" "monitoring-events"
+  ENDPOINT_PATH=""
+  case "$TOPIC" in
+    "scan-requests") ENDPOINT_PATH="/pubsub/scan-requests" ;;
+    "aggregator-tasks") ENDPOINT_PATH="/pubsub/aggregator" ;;
+    "modeler-tasks") ENDPOINT_PATH="/pubsub/modeler" ;;
+    "validator-tasks") ENDPOINT_PATH="/pubsub/validator" ;;
+    "reviewer-tasks") ENDPOINT_PATH="/pubsub/reviewer" ;;
+    "tagger-tasks") ENDPOINT_PATH="/pubsub/tagger" ;;
+    "monitoring-events") 
+       # Monitoring is broadcast to SSE via the server, worker doesn't consume it.
+       # The Server actually consumed this in the previous Pull model!
+       # We should not create a worker Push sub for monitoring.
+       continue ;;
+  esac
+
+  PUSH_ENDPOINT="${WORKER_URL}${ENDPOINT_PATH}"
+
+  if ! gcloud pubsub subscriptions describe "$SUB" &>/dev/null; then
+    echo "Creating Pub/Sub Push subscription: $SUB attached to $TOPIC -> $PUSH_ENDPOINT"
+    gcloud pubsub subscriptions create "$SUB" \
+      --topic="$TOPIC" \
+      --push-endpoint="$PUSH_ENDPOINT" \
+      --push-auth-service-account="$COMPUTE_SA"
+  else
+    echo "Updating Pub/Sub Push subscription: $SUB to $PUSH_ENDPOINT"
+    gcloud pubsub subscriptions update "$SUB" \
+      --push-endpoint="$PUSH_ENDPOINT" \
+      --push-auth-service-account="$COMPUTE_SA"
+  fi
+done
+
+echo "Deployment complete! Event-Driven Push Services are active."
