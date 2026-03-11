@@ -76,7 +76,7 @@ Before deploying the application locally or in production, ensure the following 
     go run ./cmd/server
     ```
 
-### Production Deployment
+### Cloud Run Deployment
 
 For production deployments to Google Cloud Run, execute the build script:
 
