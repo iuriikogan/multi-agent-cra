@@ -51,7 +51,7 @@ sequenceDiagram
     API->>PS: Publish(scan-requests, job_id)
     
     PS-->>Agg: Consume(scan-requests)
-    Agg->>GCP: ListAssets(scope)
+    Agg->>GCP: SearchAllResources(scope)
     GCP-->>Agg: [Asset1, Asset2...]
     loop For each Asset
         Agg->>PS: Publish(aggregator-tasks, AssetN)
@@ -80,7 +80,7 @@ sequenceDiagram
 
 ## Security Controls
 
-1.  **Strict 12-Factor Configuration:** No secrets (API keys, DB credentials) are stored in code or configuration files. They are injected exclusively via environment variables at runtime, sourced from Google Secret Manager.
+1.  **Secure Configuration Management:** No secrets (API keys, DB credentials) are stored in code or configuration files. They are injected exclusively via environment variables at runtime, sourced from Google Secret Manager.
 2.  **Least Privilege Execution:**
     *   The `server` role requires only database access and Pub/Sub publish rights.
     *   The `worker` role operates under a dedicated Service Account with specific permissions to read Cloud Asset Inventory and apply Resource Tags. It does not expose any inbound network ports.

@@ -9,7 +9,7 @@ COPY web/ ./
 RUN npm run build
 
 # --- Stage 2: Backend Builder ---
-FROM golang:1.24 AS backend-builder
+FROM golang:1.25 AS backend-builder
 WORKDIR /app
 ENV GOTOOLCHAIN=auto
 
