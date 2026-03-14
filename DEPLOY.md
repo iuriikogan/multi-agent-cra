@@ -11,6 +11,7 @@ The system deploys as two simplified Cloud Run services:
 Ensure the following prerequisites are met before deploying:
 
 *   Google Cloud Project: With billing enabled.
+*   Go Environment: Go 1.25+ is required for building the backend (as specified in the Dockerfile).
 *   APIs Enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com.
 *   Permissions: You need the Owner or Editor role on the project to run the setup script initially.
 *   Local tools: `make`, `docker-compose`, and `gcloud` CLI installed for local execution.
@@ -22,7 +23,7 @@ Ensure the following prerequisites are met before deploying:
 Run the application locally for development and testing using Docker Compose.
 
 1.  Configure Environment:
-    Copy `.env.example` to `.env` and fill in your values (specifically `GEMINI_API_KEY`).
+    Copy `.env.example` to `.env` and fill in your values (specifically `GEMINI_API_KEY`). By default, local execution via `docker-compose.yml` configures `DATABASE_TYPE=SQLITE_MEM` for an ephemeral in-memory SQLite database, avoiding the need for a separate database container.
     ```bash
     cp .env.example .env
     ```
@@ -40,6 +41,7 @@ The `build.sh` script automates the entire process:
 *   Creates Artifact Registry.
 *   Creates/Updates the `GEMINI_API_KEY` secret.
 *   Sets up Pub/Sub topics.
+*   Configures AI agents to use the Gemini 2.5 series models (`gemini-2.5-flash` for aggregation/tagging and `gemini-2.5-pro` for reasoning).
 *   Fixes IAM permissions for Cloud Build.
 *   Triggers the build and deployment.
 

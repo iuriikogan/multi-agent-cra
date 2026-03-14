@@ -56,7 +56,7 @@ test: test-go test-web
 
 test-go:
 	@echo "Running Go Unit Tests..."
-	$(GO_TEST) ./...
+	$(GO_TEST) -count=1 ./...
 
 test-web:
 	@echo "Running Web Tests..."

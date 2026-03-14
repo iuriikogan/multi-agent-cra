@@ -8,11 +8,9 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 
 *   Autonomous Agents: Specialized AI agents for Discovery (Aggregator), Modeling, Validation, Review, and Tagging.
 *   Real-time Dashboard: A Next.js frontend embedded in the Go binary featuring live Server-Sent Events (SSE) log streaming and interactive compliance charts.
-*   12-Factor Architecture: Built for the cloud. Configuration is strictly environment-variable driven. The application scales independently by setting the ROLE variable (server, worker, or all).
 *   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
 *   Flexible Storage: Choose between robust Cloud SQL (PostgreSQL) for production or lightweight in-memory SQLite for zero-dependency local development.
-*   AI-Powered: Leverages Gemini 1.5/3.0 for deep reasoning and compliance mapping via the native Go SDK.
-
+  
 ## System Architecture and Data Flow
 
 The system uses a strictly decoupled producer-consumer model:
@@ -27,7 +25,7 @@ The system uses a strictly decoupled producer-consumer model:
 
 ### Security Controls
 *   Least Privilege: Workers operate using dedicated Google Service Accounts with minimal permissions required for Asset Inventory and Pub/Sub.
-*   No Hardcoded Secrets: API keys and Database URLs are injected securely at runtime via environment variables (Factor III).
+*   No Hardcoded Secrets: API keys and Database URLs are injected securely at runtime via environment variables.
 *   Network Isolation: Cloud SQL instances should be deployed with private IPs. The cra-worker does not expose any inbound ports.
 
 ## Project Structure
@@ -58,7 +56,7 @@ Before deploying the application locally or in production, ensure the following 
 
 *   Google Cloud Platform project with billing enabled.
 *   Valid Google Cloud credentials configured (`gcloud auth application-default login`).
-*   Go 1.22 or higher installed.
+*   Go 1.25 or higher installed.
 *   A valid Gemini API Key.
 *   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com.
 
@@ -78,7 +76,7 @@ Before deploying the application locally or in production, ensure the following 
     go run ./cmd/server
     ```
 
-### Production Deployment
+### Cloud Run Deployment
 
 For production deployments to Google Cloud Run, execute the build script:
 
@@ -90,7 +88,7 @@ For production deployments to Google Cloud Run, execute the build script:
 
 To verify the deployment:
 
-1.  Navigate to the provided dashboard URL (e.g., http://localhost:8080 or the Cloud Run service URL).
+1.  Proxy the service to your localhost via gcloud cli to make it available at localhost:8080
 2.  Initiate a test scan from the UI.
 3.  Check the server logs to ensure Pub/Sub messages are being processed and the state is written to the database without errors.
 

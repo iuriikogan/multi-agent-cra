@@ -9,12 +9,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - PROJECT_ID=test-project
-      - REGION=us-central1
+      - PROJECT_ID=$PROJECT_ID
+      - REGION=$REGION
       - LOG_LEVEL=DEBUG
-      - PORT=8080
+      - SERVER_PORT=8080
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - PUBSUB_EMULATOR_HOST="http://localhost:8085/"
       - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
       - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
       - DATABASE_TYPE=SQLITE_MEM
@@ -33,11 +33,11 @@ services:
         TARGET: worker
     # In local dev, we run the worker binary directly (or via container entrypoint)
     environment:
-      - PROJECT_ID=test-project
-      - REGION=us-central1
+      - PROJECT_ID=${PROJECT_ID}
+      - REGION=${REGION}
       - LOG_LEVEL=DEBUG
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - PUBSUB_EMULATOR_HOST="http://localhost:8085/"
       - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
       - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
       - DATABASE_TYPE=SQLITE_MEM
@@ -52,7 +52,7 @@ services:
 
   pubsub:
     image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
-    command: gcloud alpha emulators pubsub start --project=test-project --host-port=0.0.0.0:8085
+    command: gcloud alpha emulators pubsub start --project=$PROJECT_ID --host-port=0.0.0.0:8085 --quiet
     ports:
       - "8085:8085"
     healthcheck:
@@ -64,21 +64,16 @@ services:
   setup-pubsub:
     image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
     environment:
-      - PUBSUB_EMULATOR_HOST=pubsub:8085
-    command:
-      - bash
-      - -c
-      - |
-        echo 'Waiting for Pub/Sub emulator...'
-        until curl -s http://pubsub:8085/; do sleep 2; done
-        echo 'Creating topic and subscription...'
-        curl -s -X PUT http://pubsub:8085/v1/projects/test-project/topics/scan-requests
-        curl -s -X PUT http://pubsub:8085/v1/projects/test-project/subscriptions/scan-requests-sub \
-          -H 'Content-Type: application/json' \
-          -d '{"topic": "projects/test-project/topics/scan-requests"}'
-        echo 'Pub/Sub resources created.'
+      - PUBSUB_EMULATOR_HOST="http://localhost:8085/"
+    command: >
+      bash -c "echo 'Waiting for Pub/Sub emulator...' &&
+      until curl -s "$PUBSUB_EMULATOR_HOST"; do sleep 2; done &&
+      echo 'Creating topic and subscription...' &&
+      curl -s -X PUT http://"$PUBSUB_EMULATOR_HOST"/v1/projects/test-project/topics/scan-requests &&
+      curl -s -X PUT http://"$PUBSUB_EMULATOR_HOST"/v1/projects/test-project/subscriptions/scan-requests-sub \
+        -H 'Content-Type: application/json' \
+        -d '{"topic": "projects/${PROJECT_ID}/topics/scan-requests"}' &&
+      echo 'Pub/Sub resources created.'"
     depends_on:
       pubsub:
         condition: service_healthy
-
-
