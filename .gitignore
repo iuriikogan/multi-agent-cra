@@ -23,13 +23,14 @@ override.tf.json
 # Terraform CLI configuration
 .terraformrc
 terraform.rc
+plan.json
 
 # Project Specific
 .vscode
 .env
 .tessl
 tessl.json
-
+/spec**
 # Reports
 *_report.txt
 *.csv

@@ -1,9 +1,4 @@
-// Package agent provides utils.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package agent provides helper utilities for transforming model-specific data types.
 package agent
 
 import (
@@ -11,6 +6,7 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
+// convertToolsToJSON transforms the SDK tool definitions into a JSON-compatible format for REST API calls.
 func convertToolsToJSON(tools []*genai.Tool) []map[string]interface{} {
 	var finalResult []map[string]interface{}
 	for _, t := range tools {
@@ -34,12 +30,13 @@ func convertToolsToJSON(tools []*genai.Tool) []map[string]interface{} {
 	return finalResult
 }
 
+// convertSchemaToJSON maps the GenAI schema structure to the expected API object format.
 func convertSchemaToJSON(s *genai.Schema) map[string]interface{} {
 	if s == nil {
 		return nil
 	}
 
-	// Use the protobuf Type enum's String() method to get the correct API representation (e.g., "STRING", "OBJECT")
+	// Use protobuf string conversion to ensure the type names match the API expectations (e.g. "STRING").
 	t := pb.Type(s.Type).String()
 
 	m := map[string]interface{}{

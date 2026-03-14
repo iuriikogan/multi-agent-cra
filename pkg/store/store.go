@@ -1,9 +1,4 @@
-// Package store provides store.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package store defines the persistence layer for scan metadata and findings.
 package store
 
 import (
@@ -11,7 +6,7 @@ import (
 	"time"
 )
 
-// ScanResult represents the metadata and findings of a CRA compliance scan.
+// ScanResult holds metadata and compliance findings for a specific scan.
 type ScanResult struct {
 	JobID       string     `json:"job_id"`
 	Scope       string     `json:"scope"`
@@ -21,20 +16,25 @@ type ScanResult struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
-// Finding represents a single security finding for a resource.
+// Finding holds security violation or compliance details for a specific resource.
 type Finding struct {
 	ResourceName string `json:"resource_name"`
 	Status       string `json:"status"`
 	Details      string `json:"details"`
 }
 
-// Store defines the interface for persisting scan data.
+// Store defines persistent storage operations for compliance scan data.
 type Store interface {
+	// CreateScan initializes a new scan record.
 	CreateScan(ctx context.Context, jobID, scope string) error
+	// UpdateScanStatus updates the lifecycle state of a scan.
 	UpdateScanStatus(ctx context.Context, jobID, status string) error
+	// AddFinding records a single assessment result.
 	AddFinding(ctx context.Context, jobID string, f Finding) error
+	// GetScan retrieves a scan and its associated findings.
 	GetScan(ctx context.Context, jobID string) (*ScanResult, error)
-	// GetAllFindings retrieves all historical compliance findings, intended for dashboard display.
+	// GetAllFindings retrieves all historical findings for aggregate reporting.
 	GetAllFindings(ctx context.Context) ([]Finding, error)
+	// Close releases underlying storage resources.
 	Close() error
 }

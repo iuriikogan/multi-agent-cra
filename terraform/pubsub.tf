@@ -1,55 +1,45 @@
+# Package pubsub configures messaging infrastructure for the multi-agent orchestration.
+
 resource "google_pubsub_topic" "scan_requests" {
-  name = "scan-requests"
+  name = "scan-requests" # Inbound scan triggers from the frontend
 }
 
 resource "google_pubsub_subscription" "scan_requests_sub" {
   name  = "scan-requests-sub"
   topic = google_pubsub_topic.scan_requests.name
 
-  ack_deadline_seconds = 600 # 10 minutes for heavy processing
-
-  retry_policy {
-    minimum_backoff = "10s"
-    maximum_backoff = "600s"
+  push_config {
+    push_endpoint = "${google_cloud_run_v2_service.worker.uri}/pubsub/scan-requests"
+    oidc_token {
+      service_account_email = google_service_account.worker_sa.email
+    }
   }
 }
 
-resource "google_pubsub_topic" "assets_found" {
-  name = "assets-found"
+resource "google_pubsub_topic" "aggregator" {
+  name = "aggregator-topic" # Resource discovery tasks
 }
 
-resource "google_pubsub_subscription" "assets_found_sub" {
-  name                 = "assets-found-sub"
-  topic                = google_pubsub_topic.assets_found.name
-  ack_deadline_seconds = 600
+resource "google_pubsub_topic" "modeler" {
+  name = "modeler-topic" # Compliance modeling tasks
 }
 
-resource "google_pubsub_topic" "models_generated" {
-  name = "models-generated"
+resource "google_pubsub_topic" "validator" {
+  name = "validator-topic" # Rule validation tasks
 }
 
-resource "google_pubsub_subscription" "models_generated_sub" {
-  name                 = "models-generated-sub"
-  topic                = google_pubsub_topic.models_generated.name
-  ack_deadline_seconds = 600
+resource "google_pubsub_topic" "reviewer" {
+  name = "reviewer-topic" # Assessment review tasks
 }
 
-resource "google_pubsub_topic" "validation_results" {
-  name = "validation-results"
+resource "google_pubsub_topic" "tagger" {
+  name = "tagger-topic" # Resource tagging tasks
 }
 
-resource "google_pubsub_subscription" "validation_results_sub" {
-  name                 = "validation-results-sub"
-  topic                = google_pubsub_topic.validation_results.name
-  ack_deadline_seconds = 600
+resource "google_pubsub_topic" "reporter" {
+  name = "reporter-topic" # Final report generation tasks
 }
 
-resource "google_pubsub_topic" "final_reports" {
-  name = "final-reports"
-}
-
-resource "google_pubsub_subscription" "final_reports_sub" {
-  name                 = "final-reports-sub"
-  topic                = google_pubsub_topic.final_reports.name
-  ack_deadline_seconds = 600
+resource "google_pubsub_topic" "monitoring" {
+  name = "monitoring-topic" # Real-time execution events
 }

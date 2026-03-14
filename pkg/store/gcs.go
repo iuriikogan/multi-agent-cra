@@ -1,9 +1,4 @@
-// Package store provides gcs.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package store provides a Google Cloud Storage (GCS) implementation of the Store interface.
 package store
 
 import (
@@ -17,11 +12,14 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// GCSStore implements the Store interface using Google Cloud Storage.
 type GCSStore struct {
-	client     *storage.Client
-	bucketName string
+	client     *storage.Client // GCS client for storage operations
+	bucketName string          // Target GCS bucket for data persistence
 }
 
+// NewGCS initializes a new GCSStore with the specified bucket name.
+// It returns a Store implementation and an error if client initialization fails.
 func NewGCS(ctx context.Context, bucketName string) (Store, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -33,17 +31,17 @@ func NewGCS(ctx context.Context, bucketName string) (Store, error) {
 	}, nil
 }
 
-// metadataPath returns the path for the scan metadata
+// metadataPath returns the GCS object path for scan metadata.
 func metadataPath(jobID string) string {
 	return fmt.Sprintf("scans/%s/metadata.json", jobID)
 }
 
-// findingPath returns the path for a specific finding
+// findingPath returns the GCS object path for a specific compliance finding.
 func findingPath(jobID, resourceName string) string {
-	// Encode resource name to avoid path issues
 	return fmt.Sprintf("scans/%s/findings/%s.json", jobID, resourceName)
 }
 
+// CreateScan initializes a new scan metadata object in GCS.
 func (s *GCSStore) CreateScan(ctx context.Context, jobID, scope string) error {
 	scan := ScanResult{
 		JobID:     jobID,
@@ -55,10 +53,8 @@ func (s *GCSStore) CreateScan(ctx context.Context, jobID, scope string) error {
 	return s.writeJSON(ctx, metadataPath(jobID), scan)
 }
 
+// UpdateScanStatus updates the status field in the scan's metadata object.
 func (s *GCSStore) UpdateScanStatus(ctx context.Context, jobID, status string) error {
-	// Read-Modify-Write metadata
-	// Note: In a high-concurrency scenario, generation preconditions should be used.
-	// For this worker, we assume single-writer ownership of the job.
 	scan, err := s.getScanMetadata(ctx, jobID)
 	if err != nil {
 		return err
@@ -73,20 +69,18 @@ func (s *GCSStore) UpdateScanStatus(ctx context.Context, jobID, status string) e
 	return s.writeJSON(ctx, metadataPath(jobID), scan)
 }
 
+// AddFinding writes an individual finding as a standalone object in GCS.
 func (s *GCSStore) AddFinding(ctx context.Context, jobID string, f Finding) error {
-	// Write finding as a separate object to avoid contention on metadata file
-	// and to allow for listing.
 	return s.writeJSON(ctx, findingPath(jobID, f.ResourceName), f)
 }
 
+// GetScan retrieves scan metadata and compiles findings by listing GCS objects.
 func (s *GCSStore) GetScan(ctx context.Context, jobID string) (*ScanResult, error) {
-	// 1. Get Metadata
 	scan, err := s.getScanMetadata(ctx, jobID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. List and Get Findings
 	it := s.client.Bucket(s.bucketName).Objects(ctx, &storage.Query{
 		Prefix: fmt.Sprintf("scans/%s/findings/", jobID),
 	})
@@ -113,7 +107,7 @@ func (s *GCSStore) GetScan(ctx context.Context, jobID string) (*ScanResult, erro
 	return scan, nil
 }
 
-// Helper: Get just the metadata object
+// getScanMetadata retrieves the core metadata object for a scan job.
 func (s *GCSStore) getScanMetadata(ctx context.Context, jobID string) (*ScanResult, error) {
 	var scan ScanResult
 	if err := s.readJSON(ctx, metadataPath(jobID), &scan); err != nil {
@@ -122,7 +116,7 @@ func (s *GCSStore) getScanMetadata(ctx context.Context, jobID string) (*ScanResu
 	return &scan, nil
 }
 
-// Helper: Write interface to JSON object in GCS
+// writeJSON encodes an interface to JSON and writes it to a GCS object.
 func (s *GCSStore) writeJSON(ctx context.Context, object string, data interface{}) error {
 	w := s.client.Bucket(s.bucketName).Object(object).NewWriter(ctx)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -132,7 +126,7 @@ func (s *GCSStore) writeJSON(ctx context.Context, object string, data interface{
 	return w.Close()
 }
 
-// Helper: Read JSON object from GCS to interface
+// readJSON reads a GCS object and decodes its JSON content into an interface.
 func (s *GCSStore) readJSON(ctx context.Context, object string, dest interface{}) error {
 	r, err := s.client.Bucket(s.bucketName).Object(object).NewReader(ctx)
 	if err != nil {
@@ -146,14 +140,12 @@ func (s *GCSStore) readJSON(ctx context.Context, object string, dest interface{}
 	return json.NewDecoder(r).Decode(dest)
 }
 
-// GetAllFindings is a no-op for GCS. Querying all findings across all jobs
-// via individual GCS JSON objects is highly inefficient.
-// CloudSQL or SQLite should be used for cross-job dashboarding.
+// GetAllFindings returns an empty list as aggregate querying is not efficient in GCS.
 func (s *GCSStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
 	return []Finding{}, nil
 }
 
-// Close closes the underlying storage client.
+// Close closes the GCS storage client.
 func (s *GCSStore) Close() error {
 	return s.client.Close()
 }

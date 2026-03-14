@@ -28,7 +28,7 @@ func TestGenerateCSV(t *testing.T) {
 	}
 
 	// Cleanup
-	os.Remove("compliance_report.csv")
+	_ = os.Remove("compliance_report.csv")
 }
 
 func TestGenerateTaggingInstructions(t *testing.T) {

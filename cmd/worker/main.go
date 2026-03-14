@@ -1,9 +1,4 @@
-// Package worker provides main.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package main serves as the entry point for the background worker service.
 package main
 
 import (
@@ -26,6 +21,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
 )
 
+// main initializes dependencies and starts the worker process.
 func main() {
 	cfg := config.Load()
 
@@ -107,7 +103,6 @@ func main() {
 
 	g, gCtx := errgroup.WithContext(ctx)
 
-	// Start Health Server
 	g.Go(func() error {
 		slog.Info("Starting combined health check and worker server", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -116,7 +111,6 @@ func main() {
 		return nil
 	})
 
-	// Graceful shutdown observer
 	g.Go(func() error {
 		<-gCtx.Done()
 		slog.Info("Shutting down worker and health server...")

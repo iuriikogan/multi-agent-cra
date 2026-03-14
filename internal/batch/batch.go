@@ -1,9 +1,4 @@
-// Package batch provides batch.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package batch implements the offline, non-concurrent assessment logic for resource analysis.
 package batch
 
 import (
@@ -23,7 +18,8 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/workflow"
 )
 
-// Run executes the batch analysis workflow.
+// Run executes a full assessment scan on a specified resource scope in batch mode.
+// It takes a context, GenAI client, API key, resource scope, and model configuration.
 func Run(ctx context.Context, client *genai.Client, apiKey, scope string, models config.ModelsConfig) {
 	aggregatorAgent := agent.New(client, apiKey, "ResourceAggregator", "Ingestion", models.Aggregator,
 		agent.WithSystemInstruction(`You are a Resource Aggregator. 

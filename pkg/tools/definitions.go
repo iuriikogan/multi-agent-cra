@@ -1,17 +1,11 @@
-// Package tools provides definitions.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package tools defines the functional capabilities accessible to agents.
 package tools
 
 import "github.com/google/generative-ai-go/genai"
 
-// Define tool sets to ensure Least Privilege.
-// Only specific agents get access to specific tool lists.
+// Tool sets are organized by agent responsibility to enforce the principle of least privilege.
 
-// ScopeTools: Used by classifiers to understand product context.
+// ScopeTools provides capabilities for agents to retrieve product-specific technical data.
 var ScopeTools = []*genai.Tool{
 	{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
@@ -30,7 +24,7 @@ var ScopeTools = []*genai.Tool{
 	},
 }
 
-// VulnTools: Used for checking vulnerabilities in software components.
+// VulnTools defines capabilities for searching known vulnerability databases.
 var VulnTools = []*genai.Tool{
 	{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
@@ -50,7 +44,7 @@ var VulnTools = []*genai.Tool{
 	},
 }
 
-// IngestionTools: Used to discover and list cloud assets or local files.
+// IngestionTools provides capabilities for cloud asset discovery and enumeration.
 var IngestionTools = []*genai.Tool{
 	{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
@@ -77,35 +71,22 @@ var IngestionTools = []*genai.Tool{
 	},
 }
 
-// TaggingTools: Used to apply remediation or classification tags to resources.
+// TaggingTools defines capabilities for applying governance tags to cloud resources.
 var TaggingTools = []*genai.Tool{
-
 	{
-
 		FunctionDeclarations: []*genai.FunctionDeclaration{
-
 			{
-
-				Name: "apply_resource_tags",
-
+				Name:        "apply_resource_tags",
 				Description: "Applies a set of key-value tags to a specified cloud resource.",
-
 				Parameters: &genai.Schema{
-
 					Type: genai.TypeObject,
-
 					Properties: map[string]*genai.Schema{
-
 						"resource_id": {Type: genai.TypeString},
-
 						"tags": {
-
-							Type: genai.TypeObject,
-
+							Type:        genai.TypeObject,
 							Description: "Key-value map of tags to apply.",
 						},
 					},
-
 					Required: []string{"resource_id", "tags"},
 				},
 			},
@@ -113,30 +94,19 @@ var TaggingTools = []*genai.Tool{
 	},
 }
 
-// ComplianceTools: Used to generate formal compliance documents.
+// ComplianceTools facilitates the generation of formal compliance documentation.
 var ComplianceTools = []*genai.Tool{
-
 	{
-
 		FunctionDeclarations: []*genai.FunctionDeclaration{
-
 			{
-
-				Name: "generate_conformity_doc",
-
+				Name:        "generate_conformity_doc",
 				Description: "Generates the official EU Declaration of Conformity PDF.",
-
 				Parameters: &genai.Schema{
-
 					Type: genai.TypeObject,
-
 					Properties: map[string]*genai.Schema{
-
 						"classification": {Type: genai.TypeString},
-
-						"product_name": {Type: genai.TypeString},
+						"product_name":   {Type: genai.TypeString},
 					},
-
 					Required: []string{"classification", "product_name"},
 				},
 			},
@@ -144,9 +114,7 @@ var ComplianceTools = []*genai.Tool{
 	},
 }
 
-// RegulatoryCheckerTools: Used to validate compliance against official texts.
-// Checker agents often don't need external tools, just logic,
-// OR they need read-only access to a "Source of Truth" (like the CRA PDF text).
+// RegulatoryCheckerTools provides read-only access to relevant regulatory frameworks.
 var RegulatoryCheckerTools = []*genai.Tool{
 	{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
@@ -165,7 +133,7 @@ var RegulatoryCheckerTools = []*genai.Tool{
 	},
 }
 
-// VisualTools: Used to generate visual reports and dashboards.
+// VisualTools allows for the generation of graphical reports and dashboards.
 var VisualTools = []*genai.Tool{
 	{
 		FunctionDeclarations: []*genai.FunctionDeclaration{

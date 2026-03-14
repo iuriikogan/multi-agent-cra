@@ -1,6 +1,5 @@
-# main.tf - Defines core service enablement
+# Package main manages the enablement of Google Cloud APIs for the compliance system.
 
-# Enable necessary APIs for the project
 resource "google_project_service" "apis" {
   for_each = toset([
     "run.googleapis.com",

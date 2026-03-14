@@ -1,42 +1,33 @@
-# cloud_run.tf - Defines Cloud Run services for server and worker
+# Package cloud_run defines the serverless compute resources for the compliance system.
 
 resource "google_cloud_run_v2_service" "server" {
   name     = var.cloud_run_server_name
   location = var.region
-  provider = google-beta
-  deletion_protection = false
+  ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    scaling {
-      min_instance_count = 0
-      max_instance_count = 5
-    }
-
+    service_account = google_service_account.server_sa.email
     vpc_access {
-      connector = google_vpc_access_connector.serverless.id
+      connector = google_vpc_access_connector.connector.id
       egress    = "ALL_TRAFFIC"
     }
-    
     containers {
-      image = var.image_repository
-      ports {
-        container_port = 8080
+      image = var.server_image
+      env {
+        name  = "PROJECT_ID"
+        value = var.project_id
       }
       env {
         name  = "ROLE"
         value = "server"
       }
       env {
-        name  = "PROJECT_ID"
-        value = var.project_id
-      }
-      env {
         name  = "DATABASE_TYPE"
         value = "CLOUD_SQL"
       }
       env {
-        name = "DATABASE_URL"
-        value = "host=${google_sql_database_instance.main.private_ip_address} port=5432 user=${var.db_user} password=${var.db_password} dbname=${google_sql_database.main.name} sslmode=require"
+        name  = "DATABASE_URL"
+        value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
       }
       env {
         name = "GEMINI_API_KEY"
@@ -49,34 +40,45 @@ resource "google_cloud_run_v2_service" "server" {
       }
     }
   }
+}
 
-  depends_on = [
-    google_project_service.apis,
-    google_sql_database_instance.main,
-    google_secret_manager_secret_iam_member.compute_sa_access,
-    google_secret_manager_secret_version.gemini_api_key_version
-  ]
+resource "google_cloud_run_v2_service_iam_member" "server_invoker" {
+  for_each = toset(var.authorized_users)
+  name     = google_cloud_run_v2_service.server.name
+  location = google_cloud_run_v2_service.server.location
+  role     = "roles/run.invoker"
+  member   = each.value
 }
 
 resource "google_cloud_run_v2_service" "worker" {
   name     = var.cloud_run_worker_name
   location = var.region
-  provider = google-beta
+  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
-    scaling {
-      min_instance_count = 1 // Ensure at least one worker is always ready
-      max_instance_count = 10
-    }
-
+    service_account = google_service_account.worker_sa.email
     vpc_access {
-      connector = google_vpc_access_connector.serverless.id
+      connector = google_vpc_access_connector.connector.id
       egress    = "ALL_TRAFFIC"
     }
-
     containers {
-      image = var.image_repository
-      # No port exposed for the worker
+      image = var.worker_image
+      env {
+        name  = "PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "ROLE"
+        value = "worker"
+      }
+      env {
+        name  = "DATABASE_TYPE"
+        value = "CLOUD_SQL"
+      }
+      env {
+        name  = "DATABASE_URL"
+        value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
+      }
       env {
         name = "GEMINI_API_KEY"
         value_source {
@@ -86,41 +88,6 @@ resource "google_cloud_run_v2_service" "worker" {
           }
         }
       }
-      env {
-        name  = "PROJECT_ID"
-        value = var.project_id
-      }
-      env {
-        name  = "DATABASE_TYPE"
-        value = "CLOUD_SQL"
-      }
-      env {
-        name = "DATABASE_URL"
-        value = "host=${google_sql_database_instance.main.private_ip_address} port=5432 user=${var.db_user} password=${var.db_password} dbname=${google_sql_database.main.name} sslmode=require"
-      }
-      env {
-        name  = "LOG_LEVEL"
-        value = "INFO"
-      }
-      env {
-        name  = "GCS_BUCKET_NAME"
-        value = "cra-data-${var.project_id}"
-      }
-      env {
-        name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
-        value = "scan-requests"
-      }
-      env {
-        name  = "PUBSUB_SUB_SCAN_REQUESTS"
-        value = "scan-requests-sub"
-      }
     }
   }
-  
-  depends_on = [
-    google_project_service.apis,
-    google_sql_database_instance.main,
-    google_secret_manager_secret_iam_member.compute_sa_access,
-    google_secret_manager_secret_version.gemini_api_key_version
-  ]
 }

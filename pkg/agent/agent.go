@@ -1,9 +1,4 @@
-// Package agent provides agent.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package agent provides an abstraction for interacting with AI models.
 package agent
 
 import (
@@ -20,7 +15,7 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-// Agent represents the behavioral contract for any AI agent in the system.
+// Agent defines the behavior for an autonomous actor in the compliance system.
 type Agent interface {
 	Name() string
 	Role() string
@@ -28,7 +23,7 @@ type Agent interface {
 	Close() error
 }
 
-// GeminiAgent is the concrete implementation using Google's GenAI SDK.
+// GeminiAgent implements the Agent interface using Google's GenAI API.
 type GeminiAgent struct {
 	name              string
 	role              string
@@ -40,10 +35,10 @@ type GeminiAgent struct {
 	executor          tools.Executor
 }
 
-// Option defines a functional option for configuring an agent.
+// Option allows for functional configuration of a GeminiAgent.
 type Option func(*GeminiAgent)
 
-// WithTools adds tools to the agent configuration.
+// WithTools attaches tools to the agent for function calling.
 func WithTools(tools ...*genai.Tool) Option {
 	return func(a *GeminiAgent) {
 		if len(tools) > 0 {
@@ -52,7 +47,7 @@ func WithTools(tools ...*genai.Tool) Option {
 	}
 }
 
-// WithSystemInstruction sets the system instruction.
+// WithSystemInstruction defines the primary behavioral prompt for the agent.
 func WithSystemInstruction(instruction string) Option {
 	return func(a *GeminiAgent) {
 		a.systemInstruction = instruction
@@ -62,21 +57,20 @@ func WithSystemInstruction(instruction string) Option {
 	}
 }
 
-// WithExecutor sets a custom tool executor.
+// WithExecutor configures a custom tool execution engine for the agent.
 func WithExecutor(executor tools.Executor) Option {
 	return func(a *GeminiAgent) {
 		a.executor = executor
 	}
 }
 
-// New creates a new GeminiAgent with the given options.
-// Configures the model, API key, and system instructions.
+// New initializes and returns a GeminiAgent with the specified identity and options.
 func New(client *genai.Client, apiKey, name, role, modelName string, opts ...Option) *GeminiAgent {
 	if modelName == "" {
 		modelName = "gemini-3.1-flash-lite-preview"
 	}
 	model := client.GenerativeModel(modelName)
-	model.SetTemperature(0.2) // Low temperature for deterministic/regulatory tasks
+	model.SetTemperature(0.2)
 
 	agent := &GeminiAgent{
 		name:      name,
@@ -91,7 +85,6 @@ func New(client *genai.Client, apiKey, name, role, modelName string, opts ...Opt
 		opt(agent)
 	}
 
-	// Default executor if not provided
 	if agent.executor == nil {
 		agent.executor = tools.NewExecutor(client)
 	}
@@ -102,6 +95,7 @@ func New(client *genai.Client, apiKey, name, role, modelName string, opts ...Opt
 func (a *GeminiAgent) Name() string { return a.name }
 func (a *GeminiAgent) Role() string { return a.role }
 
+// Close releases resources associated with the agent's executor.
 func (a *GeminiAgent) Close() error {
 	if closer, ok := a.executor.(io.Closer); ok {
 		return closer.Close()
@@ -109,19 +103,14 @@ func (a *GeminiAgent) Close() error {
 	return nil
 }
 
-// Chat executes a single interaction loop.
-// It handles potential tool calls by the model, executes them, and returns the final text response.
+// Chat facilitates a multi-turn conversation, handling autonomous tool execution.
 func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 	slog.Debug("Agent interaction started", "agent", a.name, "role", a.role, "input_length", len(input))
-	// We implement manual REST calls here because the current Go SDK (v0.20.1)
-	// does not support 'thought_signature' required by Gemini 3.1 models.
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", a.modelName, a.apiKey)
 
-	// Initialize history with system instruction if present
 	var contents []map[string]interface{}
 
-	// Prepare the initial user message
 	contents = append(contents, map[string]interface{}{
 		"role": "user",
 		"parts": []map[string]interface{}{
@@ -132,12 +121,10 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 	httpClient := &http.Client{}
 
 	for {
-		// Construct Request Body
 		reqBody := map[string]interface{}{
 			"contents": contents,
 		}
 
-		// Add System Instruction if present
 		if a.systemInstruction != "" {
 			reqBody["system_instruction"] = map[string]interface{}{
 				"parts": []map[string]interface{}{
@@ -146,7 +133,6 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 			}
 		}
 
-		// Add Tools if present
 		if len(a.model.Tools) > 0 {
 			reqBody["tools"] = convertToolsToJSON(a.model.Tools)
 		}
@@ -198,11 +184,8 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 			return "", fmt.Errorf("missing parts in content")
 		}
 
-		// Append model response to history immediately
-		// IMPORTANT: This preserves the 'thought_signature' received in 'parts'
 		contents = append(contents, content)
 
-		// Check for function calls
 		var functionCalls []map[string]interface{}
 		for _, p := range parts {
 			part := p.(map[string]interface{})
@@ -212,7 +195,6 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 		}
 
 		if len(functionCalls) == 0 {
-			// No function calls, return text
 			for _, p := range parts {
 				part := p.(map[string]interface{})
 				if text, ok := part["text"].(string); ok {
@@ -223,23 +205,19 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 			return "", fmt.Errorf("no text or function calls in response")
 		}
 
-		// Execute tools
 		var responseParts []map[string]interface{}
 		for _, fc := range functionCalls {
 			name := fc["name"].(string)
 			args := fc["args"].(map[string]interface{})
 
-			// Handle args which might be nil or empty
 			if args == nil {
 				args = make(map[string]interface{})
 			}
 
 			slog.Info("Executing tool", "agent", a.name, "tool", name)
-			// Delegate execution to the configured executor
 			result, err := a.executor.Execute(ctx, name, args)
 			if err != nil {
 				slog.Error("Tool execution failed", "tool", name, "error", err)
-				// We still return the error string to the model so it can try to recover or report it
 				result = fmt.Sprintf("System Error executing tool '%s': %v", name, err)
 			}
 
@@ -251,7 +229,6 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 			})
 		}
 
-		// Append function responses to history
 		contents = append(contents, map[string]interface{}{
 			"role":  "function",
 			"parts": responseParts,

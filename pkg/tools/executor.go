@@ -1,9 +1,4 @@
-// Package tools provides executor.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package tools provides the logic for executing agent tools against real or simulated environments.
 package tools
 
 import (
@@ -14,34 +9,34 @@ import (
 	"path/filepath"
 	"strings"
 
-	"cloud.google.com/go/asset/apiv1"
+	asset "cloud.google.com/go/asset/apiv1"
 	"cloud.google.com/go/asset/apiv1/assetpb"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/iterator"
 )
 
-// Executor defines the interface for executing tools.
+// Executor defines the interface for running tool logic and returning results as strings.
 type Executor interface {
 	Execute(ctx context.Context, name string, args map[string]interface{}) (string, error)
 }
 
-// DefaultExecutor implements the Executor interface with the standard toolset.
+// DefaultExecutor implements various ecosystem tools for the compliance agents.
 type DefaultExecutor struct {
 	Client      *genai.Client
 	AssetClient *asset.Client
 }
 
-// NewExecutor creates a new DefaultExecutor.
+// NewExecutor initializes and returns a DefaultExecutor.
 func NewExecutor(client *genai.Client) *DefaultExecutor {
 	return &DefaultExecutor{Client: client}
 }
 
-// SetAssetClient allows providing a shared Asset Inventory client.
+// SetAssetClient configures a specific Google Cloud Asset client for the executor.
 func (e *DefaultExecutor) SetAssetClient(client *asset.Client) {
 	e.AssetClient = client
 }
 
-// Close releases resources held by the executor.
+// Close releases resources and clients held by the executor.
 func (e *DefaultExecutor) Close() error {
 	if e.AssetClient != nil {
 		return e.AssetClient.Close()
@@ -49,7 +44,7 @@ func (e *DefaultExecutor) Close() error {
 	return nil
 }
 
-// Execute routes tool calls to their implementation.
+// Execute dispatches the tool call to its respective internal handler.
 func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[string]interface{}) (string, error) {
 	switch name {
 	case "get_product_specs":
@@ -75,19 +70,18 @@ func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[str
 	}
 }
 
+// listGCPAssets uses the Cloud Asset API to search for resources across the project or organization.
 func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]interface{}) (string, error) {
 	parent, _ := args["parent"].(string)
 	if parent == "" {
 		return "Error: parent argument is required.", nil
 	}
 
-	// Prepare parent string for SDK
 	scope := parent
 	if !strings.HasPrefix(scope, "projects/") && !strings.HasPrefix(scope, "folders/") && !strings.HasPrefix(scope, "organizations/") {
 		scope = "projects/" + parent
 	}
 
-	// Use the cached client if available, otherwise create one and cache it
 	if e.AssetClient == nil {
 		var err error
 		e.AssetClient, err = asset.NewClient(ctx)
@@ -102,7 +96,6 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 		AssetTypes: []string{},
 	}
 
-	// Handle optional asset_types filtering
 	if types, ok := args["asset_types"].([]interface{}); ok && len(types) > 0 {
 		for _, t := range types {
 			if s, ok := t.(string); ok {
@@ -138,6 +131,7 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 	return string(finalJSON), nil
 }
 
+// generateVisualDashboard utilizes the image generation capabilities of the model to create a compliance visual.
 func (e *DefaultExecutor) generateVisualDashboard(ctx context.Context, args map[string]interface{}) (string, error) {
 	prompt, _ := args["prompt"].(string)
 	filename, _ := args["filename"].(string)
@@ -145,8 +139,6 @@ func (e *DefaultExecutor) generateVisualDashboard(ctx context.Context, args map[
 		return "Error: prompt and filename are required.", nil
 	}
 
-	// Use the image generation model
-	// TODO: Use correct model name from config or constant
 	imgModel := e.Client.GenerativeModel("gemini-3-pro-image-preview")
 	resp, err := imgModel.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
@@ -159,7 +151,6 @@ func (e *DefaultExecutor) generateVisualDashboard(ctx context.Context, args map[
 
 	for _, part := range resp.Candidates[0].Content.Parts {
 		if blob, ok := part.(genai.Blob); ok {
-			// Sanitize filename to prevent path traversal
 			safeFilename := filepath.Base(filename)
 			if err := os.WriteFile(safeFilename, blob.Data, 0644); err != nil {
 				return fmt.Sprintf("Error saving image to file: %v", err), nil

@@ -1,9 +1,4 @@
-// Package worker provides worker.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package worker implements the core processing logic for assessment agents.
 package worker
 
 import (
@@ -26,7 +21,8 @@ import (
 	"google.golang.org/api/option"
 )
 
-// RegisterRoutes sets up the HTTP handlers for Pub/Sub push messages
+// RegisterRoutes configures HTTP and Pub/Sub handlers for worker agents.
+// It returns a cleanup function to release agent resources and an error if initialization fails.
 func RegisterRoutes(ctx context.Context, mux *http.ServeMux, cfg *config.Config, pubsubClient *queue.Client, db store.Store) (func(), error) {
 	genaiClient, err := genai.NewClient(ctx, option.WithAPIKey(cfg.APIKey))
 	if err != nil {
@@ -120,7 +116,6 @@ The output should be a JSON object with the following fields: 'resource_name', '
 		}
 		if err := json.Unmarshal(req.Message.Data, &job); err != nil {
 			slog.Error("Failed to parse job from push", "error", err)
-			// Return 200 so pubsub doesn't retry hopelessly bad payloads
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -160,6 +155,7 @@ The output should be a JSON object with the following fields: 'resource_name', '
 	return cleanup, nil
 }
 
+// runScan executes resource discovery and delegates assessment tasks to agents.
 func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, aggregator agent.Agent, scope, jobID string, db store.Store) error {
 	discoveryCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
@@ -191,19 +187,16 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 	if !parsed {
 		jsonStr = strings.TrimSpace(jsonStr)
 		if err := json.Unmarshal([]byte(jsonStr), &assets); err != nil {
-			// If unmarshaling into a slice fails, try unmarshaling into a single object.
 			var singleAsset Asset
 			if err2 := json.Unmarshal([]byte(jsonStr), &singleAsset); err2 == nil {
 				assets = []Asset{singleAsset}
 			} else {
-				// If that also fails, try the wrapper object.
 				var wrapper struct {
 					Assets []Asset `json:"assets"`
 				}
 				if err3 := json.Unmarshal([]byte(jsonStr), &wrapper); err3 == nil && wrapper.Assets != nil {
 					assets = wrapper.Assets
 				} else {
-					// If all attempts fail, return the original error.
 					return fmt.Errorf("failed to parse assets: %w", err)
 				}
 			}

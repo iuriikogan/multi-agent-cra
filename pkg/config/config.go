@@ -1,18 +1,11 @@
-// Package config provides config.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package config centralizes application settings derived from environment variables.
 package config
 
 import (
 	"os"
 )
 
-// Config centralizes all application configuration.
-// It strictly adheres to the 12-factor app methodology (Factor III: Config)
-// by deriving all values exclusively from the environment.
+// Config aggregates all operational parameters for the multi-agent system.
 type Config struct {
 	ProjectID     string
 	Region        string
@@ -27,7 +20,7 @@ type Config struct {
 	Models        ModelsConfig
 }
 
-// ModelsConfig holds model names for each agent
+// ModelsConfig specifies the AI model versions utilized by each agent in the pipeline.
 type ModelsConfig struct {
 	Aggregator     string
 	Modeler        string
@@ -38,9 +31,7 @@ type ModelsConfig struct {
 	VisualReporter string
 }
 
-// PubSubConfig holds topic and subscription mappings.
-// Using discrete topics for each agent stage decouples the producers and consumers,
-// allowing independent scaling and fault isolation by preventing a failure in one stage from impacting others.
+// PubSubConfig maps agent stages to specific Google Cloud Pub/Sub topics and subscriptions.
 type PubSubConfig struct {
 	TopicScanRequests string
 	SubScanRequests   string
@@ -60,14 +51,12 @@ type PubSubConfig struct {
 	SubMonitoring     string
 }
 
-// ServerConfig configures the HTTP transport.
+// ServerConfig stores settings related to the HTTP transport layer.
 type ServerConfig struct {
 	Port string
 }
 
-// Load populates the configuration structs strictly from environment variables.
-// Default values are provided for non-critical infrastructure paths to simplify local development,
-// but production requires explicit definition to avoid unpredictable behavior.
+// Load populates the Config object from environment variables, using sane defaults for optional values.
 func Load() *Config {
 	projectID := os.Getenv("PROJECT_ID")
 	return &Config{
@@ -112,8 +101,7 @@ func Load() *Config {
 	}
 }
 
-// getEnv handles environment fallback logic to maintain backward compatibility
-// or ease local setup without cluttered .env files.
+// getEnv retrieves the value of an environment variable or returns a fallback if not set.
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value

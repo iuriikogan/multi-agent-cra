@@ -1,9 +1,4 @@
-// Package batch provides main.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package main serves as the entry point for the offline batch assessment tool.
 package main
 
 import (
@@ -22,6 +17,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
 )
 
+// main initializes dependencies and executes the batch analysis workflow.
 func main() {
 	cfg := config.Load()
 

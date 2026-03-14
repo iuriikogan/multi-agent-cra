@@ -1,17 +1,27 @@
 steps:
-  # --- SERVER BUILD & DEPLOY ---
-  # Build Server Image (runs in parallel with worker build)
+  # --- SERVER BUILD & PUSH ---
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build Server'
-    waitFor: ['-'] # Start immediately
+    waitFor: ['-']
     args: ['build', '--build-arg', 'TARGET=server', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}', '.']
   
-  # Push Server Image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Push Server'
     waitFor: ['Build Server']
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}']
 
+  # --- WORKER BUILD & PUSH ---
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Worker'
+    waitFor: ['-']
+    args: ['build', '--build-arg', 'TARGET=worker', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}', '.']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Worker'
+    waitFor: ['Build Worker']
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}']
+
+  # --- DEPLOYMENT ---
   # Deploy Server Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Server'
@@ -25,28 +35,19 @@ steps:
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
       - '--region'
       - '${_REGION}'
+      - '--service-account'
+      - 'sa-reporter@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--vpc-connector'
+      - 'cra-connector'
       - '--set-env-vars'
-      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID},ROLE=server,MODEL_AGGREGATOR=${_MODEL_AGGREGATOR},MODEL_MODELER=${_MODEL_MODELER},MODEL_VALIDATOR=${_MODEL_VALIDATOR},MODEL_REVIEWER=${_MODEL_REVIEWER},MODEL_TAGGER=${_MODEL_TAGGER},MODEL_REPORTER=${_MODEL_REPORTER}'
+      - 'PROJECT_ID=${PROJECT_ID},ROLE=server,DATABASE_TYPE=CLOUD_SQL'
+      - '--set-env-vars'
+      - 'DATABASE_URL=cra_user:change_me_in_production@tcp(${_DB_IP}:3306)/cra_db?parseTime=true'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      - '--allow-unauthenticated'
-      - '--min-instances'
-      - '1'
+      - '--no-allow-unauthenticated'
 
-  # --- WORKER BUILD & DEPLOY ---
-  # Build Worker Image (runs in parallel with server build)
-  - name: 'gcr.io/cloud-builders/docker'
-    id: 'Build Worker'
-    waitFor: ['-'] # Start immediately
-    args: ['build', '--build-arg', 'TARGET=worker', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}', '.']
-  
-  # Push Worker Image
-  - name: 'gcr.io/cloud-builders/docker'
-    id: 'Push Worker'
-    waitFor: ['Build Worker']
-    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}']
-
-  # Deploy Worker Service (Push Webhook)
+  # Deploy Worker Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Worker'
     waitFor: ['Push Worker']
@@ -59,31 +60,25 @@ steps:
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
       - '--region'
       - '${_REGION}'
+      - '--service-account'
+      - 'sa-classifier@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--vpc-connector'
+      - 'cra-connector'
       - '--set-env-vars'
-      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID},ROLE=worker,MODEL_AGGREGATOR=${_MODEL_AGGREGATOR},MODEL_MODELER=${_MODEL_MODELER},MODEL_VALIDATOR=${_MODEL_VALIDATOR},MODEL_REVIEWER=${_MODEL_REVIEWER},MODEL_TAGGER=${_MODEL_TAGGER},MODEL_REPORTER=${_MODEL_REPORTER}'
+      - 'PROJECT_ID=${PROJECT_ID},ROLE=worker,DATABASE_TYPE=CLOUD_SQL'
+      - '--set-env-vars'
+      - 'DATABASE_URL=cra_user:change_me_in_production@tcp(${_DB_IP}:3306)/cra_db?parseTime=true'
       - '--set-env-vars'
       - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      # Require authentication for Pub/Sub push requests
       - '--no-allow-unauthenticated'
-      # Allow scaling to 0, no CPU allocation when idle required anymore!
-      - '--min-instances'
-      - '0'
 
 substitutions:
   _REGION: europe-west1
   _REPO_NAME: multi-agent-cra
   _TAG: latest
-  _MODEL_AGGREGATOR: gemini-2.5-flash
-  _MODEL_MODELER: gemini-2.5-pro
-  _MODEL_VALIDATOR: gemini-2-pro
-  _MODEL_REVIEWER: gemini-2.5-pro
-  _MODEL_TAGGER: gemini-2.5-pro 
-  _MODEL_REPORTER: gemini-2.5-pro
-
-options:
-  machineType: 'E2_HIGHCPU_8'
+  _DB_IP: 10.0.0.3 # Dynamically replaced by build.sh
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'

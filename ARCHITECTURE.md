@@ -81,21 +81,25 @@ sequenceDiagram
 ## Security Controls
 
 1.  **Secure Configuration Management:** No secrets (API keys, DB credentials) are stored in code or configuration files. They are injected exclusively via environment variables at runtime, sourced from Google Secret Manager.
-2.  **Least Privilege Execution:**
-    *   The `server` role requires only database access and Pub/Sub publish rights.
-    *   The `worker` role operates under a dedicated Service Account with specific permissions to read Cloud Asset Inventory and apply Resource Tags. It does not expose any inbound network ports.
+2.  **Least Privilege Execution (Identity-Based Security):**
+    *   The system uses dedicated Google Service Accounts (defined in `iam.tf`) for different agent stages:
+        *   `sa-classifier`: Aggregation and scoping.
+        *   `sa-auditor`: Regulatory auditing.
+        *   `sa-vuln`: Vulnerability analysis.
+        *   `sa-reporter`: Final compliance reporting and database writes.
+    *   **Pub/Sub Push Authentication**: All internal agent communication uses Pub/Sub **Push Subscriptions** with OIDC token authentication. The worker services validate these tokens, ensuring that only the authorized Pub/Sub service can trigger agent logic.
 3.  **Network Isolation:** 
-    *   The Cloud SQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
-    *   Serverless VPC Access connectors route traffic from Cloud Run to the private database.
+    *   **Private Cloud SQL**: The PostgreSQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
+    *   **Serverless VPC Access**: Cloud Run services use a dedicated VPC Connector to securely reach the private database.
 4.  **Ingress Protection:**
-    *   Google Cloud Armor sits in front of the API server, providing WAF and DDoS protection.
+    *   Google Cloud Armor provides WAF and DDoS protection.
     *   **Model Armor** integration inspects incoming requests for prompt injection or jailbreak attempts before they reach the Gemini AI agents.
 
 ## State Management
 
 The system abstracts state management through a `Store` interface, allowing flexibility based on deployment needs:
 
-*   **Cloud SQL (PostgreSQL):** Used for production. Provides robust, concurrent transaction support and complex querying capabilities for the CRA Dashboard.
-*   **SQLite (In-Memory):** Used for local development and CI/CD pipelines. It provides a zero-dependency, ephemeral database that perfectly mimics the relational structure of Cloud SQL without requiring a running database server.
+*   **Cloud SQL (PostgreSQL):** Used for production. Provides robust, concurrent transaction support and complex querying capabilities for the CRA Dashboard. Database connections are secured via SSL and private IP.
+*   **SQLite (In-Memory):** Used for local development and CI/CD pipelines. It provides a zero-dependency, ephemeral database that perfectly mimics the relational structure of Cloud SQL.
 
 The frontend dashboard queries this state via the `/api/findings` endpoint, pulling historical compliance data independently of the real-time Pub/Sub pipeline.

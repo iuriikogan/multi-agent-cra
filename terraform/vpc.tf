@@ -1,8 +1,8 @@
-# vpc.tf - Defines the VPC network and Serverless VPC Access connector
+# Package vpc defines the network topology and serverless connectivity for the system.
 
 resource "google_compute_network" "vpc" {
   name                    = "cra-vpc"
-  auto_create_subnetworks = false
+  auto_create_subnetworks = false # Custom subnetting for better control
 }
 
 resource "google_compute_subnetwork" "default" {
@@ -18,10 +18,10 @@ resource "google_compute_subnetwork" "default" {
   }
 }
 
-resource "google_vpc_access_connector" "serverless" {
+resource "google_vpc_access_connector" "connector" {
   name          = "cra-connector"
   region        = var.region
-  ip_cidr_range = "10.8.0.0/28"
+  ip_cidr_range = "10.8.0.0/28" # Small range is sufficient for serverless egress
   network       = google_compute_network.vpc.id
   min_instances = 2
   max_instances = 3
@@ -29,7 +29,7 @@ resource "google_vpc_access_connector" "serverless" {
   depends_on = [google_project_service.apis]
 }
 
-# Required for the private Cloud SQL instance
+# google_compute_global_address reserves an internal IP range for Private Service Connect.
 resource "google_compute_global_address" "private_ip_address" {
   name          = "private-ip-for-sql"
   purpose       = "VPC_PEERING"
@@ -38,6 +38,7 @@ resource "google_compute_global_address" "private_ip_address" {
   network       = google_compute_network.vpc.id
 }
 
+# google_service_networking_connection establishes peering between the VPC and Google services.
 resource "google_service_networking_connection" "private_vpc_connection" {
   network                 = google_compute_network.vpc.id
   service                 = "servicenetworking.googleapis.com"

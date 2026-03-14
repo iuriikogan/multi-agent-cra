@@ -1,9 +1,4 @@
-// Package store provides sqlite.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package store provides a SQLite implementation of the Store interface for local use.
 package store
 
 import (
@@ -14,25 +9,21 @@ import (
 	"strings"
 	"time"
 
-	// Use pure Go SQLite driver to avoid CGO complications during CI/CD and cross-compilation.
-	// This ensures greater portability and easier builds in containerized environments.
+	// Register pure Go SQLite driver (CGO-free)
 	_ "modernc.org/sqlite"
 )
 
-// SQLiteStore provides a lightweight, local relational store. It is primarily
-// used for development, testing, or standalone deployments where managing CloudSQL is overhead.
+// SQLiteStore implements the Store interface using a local or in-memory SQLite database.
 type SQLiteStore struct {
-	db *sql.DB
+	db *sql.DB // Underlying database connection
 }
 
-// NewSQLite initializes a SQLite database connection. Defaults to an in-memory db
-// if no DSN is provided, ensuring zero-configuration setups work out of the box,
-// and providing a clean, stateless environment for testing and development.
+// NewSQLite initializes a new SQLiteStore with the provided DSN.
+// It returns a Store implementation and an error if initialization fails.
 func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 	if dsn == "" {
-		dsn = ":memory:" // Use ephemeral memory to guarantee clean state across restarts
+		dsn = ":memory:"
 	}
-	// Enable foreign key support for data integrity
 	if !strings.Contains(dsn, "_pragma=foreign_keys") {
 		if strings.Contains(dsn, "?") {
 			dsn += "&_pragma=foreign_keys(1)"
@@ -45,13 +36,10 @@ func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 	}
 
-	// Verify the database is ready for queries.
 	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping sqlite database: %w", err)
 	}
 
-	// Auto-create schema. SQLite uses standard SQL but maps types internally (e.g., DATETIME, TEXT).
-	// This ensures the application starts without requiring external migration scripts.
 	if _, err := db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS scans (
 			job_id TEXT PRIMARY KEY,
@@ -74,13 +62,15 @@ func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
-// CreateScan initializes tracking for a new workflow.
+// CreateScan registers a new scan job if it does not already exist.
+// It takes a context, jobID, and scope, returning an error if the operation fails.
 func (s *SQLiteStore) CreateScan(ctx context.Context, jobID, scope string) error {
 	_, err := s.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status) VALUES (?, ?, ?) ON CONFLICT (job_id) DO NOTHING", jobID, scope, "running")
 	return err
 }
 
-// UpdateScanStatus tracks job progression and timestamps completion.
+// UpdateScanStatus updates the status of a specific scan job.
+// It takes a context, jobID, and status, returning an error if the operation fails.
 func (s *SQLiteStore) UpdateScanStatus(ctx context.Context, jobID, status string) error {
 	var completedAt *time.Time
 	if status == "completed" || status == "failed" {
@@ -91,18 +81,16 @@ func (s *SQLiteStore) UpdateScanStatus(ctx context.Context, jobID, status string
 	return err
 }
 
-// AddFinding persists individual rules matched against resources.
-// JSON is stored as raw TEXT since SQLite lacks native JSONB support, 
-// which might limit advanced querying compared to PostgreSQL but is simpler for local use.
+// AddFinding saves a single compliance finding for a job to SQLite.
+// It takes a context, jobID, and finding object, returning an error if the operation fails.
 func (s *SQLiteStore) AddFinding(ctx context.Context, jobID string, f Finding) error {
 	details, _ := json.Marshal(f.Details)
 	_, err := s.db.ExecContext(ctx, "INSERT INTO findings (job_id, resource_name, status, details) VALUES (?, ?, ?, ?)", jobID, f.ResourceName, f.Status, string(details))
 	return err
 }
 
-// GetScan builds a complete view of a specific execution run.
-// It performs a query to fetch the scan header, then iterates through associated findings, 
-// effectively joining data from multiple tables for a comprehensive result.
+// GetScan retrieves scan header data and all associated findings from SQLite.
+// It takes a context and jobID, returning a ScanResult pointer and an error if the operation fails.
 func (s *SQLiteStore) GetScan(ctx context.Context, jobID string) (*ScanResult, error) {
 	row := s.db.QueryRowContext(ctx, "SELECT job_id, scope, status, created_at, completed_at FROM scans WHERE job_id = ?", jobID)
 	var res ScanResult
@@ -130,8 +118,8 @@ func (s *SQLiteStore) GetScan(ctx context.Context, jobID string) (*ScanResult, e
 	return &res, nil
 }
 
-// GetAllFindings retrieves the un-partitioned list of findings required for organization-wide dashboards.
-// It queries the findings table directly, optimized for displaying aggregated data to users.
+// GetAllFindings retrieves all findings across all jobs for global dashboard views.
+// It takes a context and returns a slice of findings and an error if the query fails.
 func (s *SQLiteStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT resource_name, status, details FROM findings")
 	if err != nil {
@@ -154,8 +142,8 @@ func (s *SQLiteStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
 	return findings, nil
 }
 
-// Close gracefully releases the local file lock or memory mapping, 
-// and importantly, closes the underlying database connection pool to prevent resource leaks.
+// Close closes the underlying SQLite database connection.
+// It returns an error if the connection closure fails.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }

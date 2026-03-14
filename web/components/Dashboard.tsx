@@ -1,9 +1,3 @@
-/**
- * Rationale: Implements the UI/UX or domain logic for the Next.js frontend, adhering to
- * React functional component paradigms and Material UI design specifications.
- * Terminology: CRA Dashboard, SSR (Server-Side Rendering), Component.
- * Measurability: Enhances user interaction by providing responsive, accessible interfaces.
- */
 import { useState, useEffect, useRef } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
@@ -15,12 +9,14 @@ import {
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+// Finding represents a single security finding for a resource.
 interface Finding {
   resource_name: string;
   status: string;
   details: string;
 }
 
+// ScanResult holds the outcome and metadata of a completed compliance scan.
 interface ScanResult {
   job_id: string;
   scope: string;
@@ -29,6 +25,7 @@ interface ScanResult {
   created_at: string;
 }
 
+// MonitoringEvent represents a real-time status update from an agent.
 interface MonitoringEvent {
   job_id: string;
   resource_name: string;
@@ -38,6 +35,7 @@ interface MonitoringEvent {
   timestamp: string;
 }
 
+// Dashboard provides a real-time view of agent execution and scan results.
 export default function Dashboard() {
   const [scope, setScope] = useState('projects/test-project');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -47,21 +45,19 @@ export default function Dashboard() {
   const [events, setEvents] = useState<MonitoringEvent[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // SSE for Real-time Monitoring
   useEffect(() => {
+    // Establishes SSE connection for real-time monitoring of agent activities.
     const eventSource = new EventSource('/api/stream');
     
     eventSource.onmessage = (event) => {
       try {
         const data: MonitoringEvent = JSON.parse(event.data);
-        setEvents((prev) => [data, ...prev].slice(0, 100)); // Keep last 100
-        
-        // If event belongs to our current scan, refresh result
+        setEvents((prev) => [data, ...prev].slice(0, 100)); 
+
         if (jobId && data.job_id === jobId && data.status === 'completed' && data.agent_name === 'ResourceTagger') {
            fetchScanResult(jobId);
         }
       } catch (err) {
-        // Log parsing errors but continue listening to the stream to maintain live updates.
         console.error("Failed to parse SSE data", err);
       }
     };
@@ -74,13 +70,13 @@ export default function Dashboard() {
     return () => eventSource.close();
   }, [jobId]);
 
+  // fetchScanResult polls the backend for full scan details when a job completes.
   const fetchScanResult = async (id: string) => {
     try {
       const res = await fetch(`/api/scan?id=${id}`);
       if (res.ok) {
         const data: ScanResult = await res.json();
         setScanResult(data);
-        // Update loading state only if the scan has reached a terminal state (completed or failed).
         if (data.status === 'completed' || data.status === 'failed') {
           setLoading(false);
         }
@@ -90,6 +86,7 @@ export default function Dashboard() {
     }
   };
 
+  // handleScan initiates a new background scan for the specified scope.
   const handleScan = async () => {
     setLoading(true);
     setError(null);
@@ -113,9 +110,14 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate stats
-  const compliantCount = scanResult?.findings.filter(f => f.status === 'true' || f.status === 'Compliant').length || 0;
-  const nonCompliantCount = scanResult?.findings.filter(f => f.status === 'false' || f.status === 'Non-Compliant').length || 0;
+  const compliantCount = scanResult?.findings.filter(f => {
+    const s = f.status.toLowerCase();
+    return s === 'true' || s === 'compliant' || s === 'approved';
+  }).length || 0;
+  const nonCompliantCount = scanResult?.findings.filter(f => {
+    const s = f.status.toLowerCase();
+    return s === 'false' || s === 'non-compliant' || s === 'failed' || s === 'rejected';
+  }).length || 0;
   
   const chartData = {
     labels: ['Compliant', 'Non-Compliant'],
@@ -131,7 +133,6 @@ export default function Dashboard() {
 
   return (
     <Grid container spacing={3}>
-      {/* Control Panel / Chat Input */}
       <Grid item xs={12}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5' }}>
           <Typography component="h2" variant="h6" color="primary" gutterBottom>
@@ -161,7 +162,6 @@ export default function Dashboard() {
         </Paper>
       </Grid>
 
-      {/* Live Agent Logs */}
       <Grid item xs={12} md={4}>
         <Paper sx={{ p: 2, height: 500, display: 'flex', flexDirection: 'column' }}>
           <Typography variant="h6" gutterBottom color="secondary">
@@ -180,7 +180,6 @@ export default function Dashboard() {
         </Paper>
       </Grid>
 
-      {/* Stats and Findings */}
       <Grid item xs={12} md={8}>
         <Grid container spacing={3}>
           <Grid item xs={12}>
@@ -211,7 +210,14 @@ export default function Dashboard() {
                       {scanResult.findings.map((f, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{f.resource_name}</TableCell>
-                          <TableCell><Chip label={f.status} color={f.status === 'true' || f.status === 'Compliant' ? 'success' : 'error'} size="small" /></TableCell>
+                          <TableCell>
+                            <Chip
+                              label={f.status}
+                              color={(f.status.toLowerCase() === 'true' || f.status.toLowerCase() === 'compliant' || f.status.toLowerCase() === 'approved') ? 'success' :
+                                (f.status.toLowerCase() === 'false' || f.status.toLowerCase() === 'non-compliant' || f.status.toLowerCase() === 'failed' || f.status.toLowerCase() === 'rejected') ? 'error' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
                           <TableCell>{f.details}</TableCell>
                         </TableRow>
                       ))}

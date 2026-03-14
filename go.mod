@@ -8,9 +8,9 @@ require (
 	cloud.google.com/go/pubsub/v2 v2.4.0
 	cloud.google.com/go/storage v1.56.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
-	github.com/lib/pq v1.11.2
 	golang.org/x/sync v0.19.0
 	google.golang.org/api v0.259.0
 	modernc.org/sqlite v1.46.1
@@ -28,6 +28,7 @@ require (
 	cloud.google.com/go/monitoring v1.24.3 // indirect
 	cloud.google.com/go/orgpolicy v1.15.1 // indirect
 	cloud.google.com/go/osconfig v1.15.1 // indirect
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.53.0 // indirect

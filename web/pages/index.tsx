@@ -1,21 +1,17 @@
-/**
- * Rationale: Implements the UI/UX or domain logic for the Next.js frontend, adhering to
- * React functional component paradigms and Material UI design specifications.
- * Terminology: CRA Dashboard, SSR (Server-Side Rendering), Component.
- * Measurability: Enhances user interaction by providing responsive, accessible interfaces.
- */
 import Head from 'next/head'
 import { useState, SyntheticEvent } from 'react'
 import { Container, Typography, Box, Tabs, Tab } from '@mui/material'
 import Dashboard from '../components/Dashboard'
 import CRADashboard from '../components/CRADashboard'
 
+// TabPanelProps defines the structure for custom tab content panels.
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
 
+// CustomTabPanel renders children only when the associated tab is selected.
 function CustomTabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
@@ -27,7 +23,6 @@ function CustomTabPanel(props: TabPanelProps) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      {/* Only render children when the tab is active to improve frontend performance. */}
       {value === index && (
         <Box sx={{ p: 3 }}>
           {children}
@@ -37,14 +32,15 @@ function CustomTabPanel(props: TabPanelProps) {
   );
 }
 
+// a11yProps generates accessibility attributes for tab elements.
 function a11yProps(index: number) {
-  // Generates ARIA attributes for tab components to improve screen reader navigation and overall accessibility.
   return {
     id: `simple-tab-${index}`,
     'aria-controls': `simple-tabpanel-${index}`,
   };
 }
 
+// Home serves as the main entry point for the Next.js compliance dashboard.
 export default function Home() {
   const [value, setValue] = useState(0);
 

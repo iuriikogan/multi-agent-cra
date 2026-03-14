@@ -1,9 +1,4 @@
-// Package server provides main.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package main serves as the entry point for the compliance dashboard server.
 package main
 
 import (
@@ -21,7 +16,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
 )
 
-
+// main initializes dependencies and starts the HTTP server.
 func main() {
 	cfg := config.Load()
 	logger.Setup(cfg.LogLevel)

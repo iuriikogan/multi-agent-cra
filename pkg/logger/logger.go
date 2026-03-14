@@ -1,9 +1,4 @@
-// Package logger provides logger.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package logger provides a structured logging wrapper using slog.
 package logger
 
 import (
@@ -11,8 +6,8 @@ import (
 	"os"
 )
 
-// Setup initializes the global logger with the specified options.
-// It configures structured logging (JSON) and sets the log level.
+// Setup initializes the global default logger with the given level.
+// Supports DEBUG, INFO (default), WARN, and ERROR.
 func Setup(level string) {
 	var logLevel slog.Level
 	switch level {
@@ -27,12 +22,11 @@ func Setup(level string) {
 	}
 
 	opts := &slog.HandlerOptions{
-		Level: logLevel,
-		// Add source file information for easier debugging
+		Level:     logLevel,
 		AddSource: true,
 	}
 
-	// Use JSON handler for structured logging, suitable for cloud aggregation
+	// Use JSON handler for structured logs suitable for Google Cloud Logging.
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, opts))
 	slog.SetDefault(logger)
 }

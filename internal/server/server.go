@@ -1,9 +1,4 @@
-// Package server provides server.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package server implements the HTTP API and SSE streaming for the compliance dashboard.
 package server
 
 import (
@@ -21,14 +16,14 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
 )
 
-// Hub manages Server-Sent Events (SSE) connections.
+// Hub manages a set of active SSE client channels and broadcasts messages to them.
 type Hub struct {
-	Clients   map[chan string]bool
-	Broadcast chan string
-	mu        sync.Mutex
+	Clients   map[chan string]bool // Registered client channels
+	Broadcast chan string          // Inbound messages to be broadcast
+	mu        sync.Mutex           // Protects the Clients map
 }
 
-// NewHub creates a synchronization point for managing active SSE client subscriptions
+// NewHub initializes and returns a new SSE Hub.
 func NewHub() *Hub {
 	return &Hub{
 		Clients:   make(map[chan string]bool),
@@ -36,7 +31,7 @@ func NewHub() *Hub {
 	}
 }
 
-// Run continually listens for new broadcast messages and pushes them to all active client channels.
+// Run starts the hub's broadcast loop, distributing messages to all registered clients.
 func (h *Hub) Run(ctx context.Context) {
 	for {
 		select {
@@ -57,7 +52,8 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 }
 
-// NewAppHandler constructs the main server handler
+// NewAppHandler initializes the server's HTTP mux with API and static file routes.
+// It takes a context, config, pubsub client, database store, and hub instance.
 func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store, hub *Hub) http.Handler {
 	apiMux := http.NewServeMux()
 
@@ -143,14 +139,13 @@ func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.
 		}
 	})
 
-	// Serve the static Next.js export from the web/out directory
 	fs := http.FileServer(http.Dir("web/out"))
 	apiMux.Handle("/", fs)
 
 	return apiMux
 }
 
-// Start initiates the HTTP server process
+// Start launches the HTTP server and manages its lifecycle.
 func Start(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, db store.Store, hub *Hub) error {
 	mux := NewAppHandler(ctx, cfg, pubsubClient, db, hub)
 
@@ -182,6 +177,7 @@ func Start(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, 
 	return nil
 }
 
+// handleScanCreate processes requests to initiate a new compliance scan.
 func handleScanCreate(w http.ResponseWriter, r *http.Request, pubsubClient *queue.Client, cfg *config.Config, db store.Store) {
 	var req struct {
 		Scope string `json:"scope"`
@@ -212,6 +208,7 @@ func handleScanCreate(w http.ResponseWriter, r *http.Request, pubsubClient *queu
 	}
 }
 
+// handleGetScan retrieves detailed results for a specific scan job.
 func handleGetScan(w http.ResponseWriter, r *http.Request, db store.Store) {
 	jobID := r.URL.Query().Get("id")
 	if jobID == "" {

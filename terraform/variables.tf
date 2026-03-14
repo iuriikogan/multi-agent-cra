@@ -1,64 +1,52 @@
+# Package variables defines input parameters for the compliance system infrastructure.
+
 variable "project_id" {
-  description = "The Google Cloud Project ID"
+  description = "The target GCP project ID."
   type        = string
 }
 
 variable "region" {
-  description = "The GCP region to deploy to"
+  description = "The GCP region for deployment."
   type        = string
-  default     = "us-central1"
+  default     = "europe-west1"
+}
+
+variable "db_password" {
+  description = "Password for the Cloud SQL database instance."
+  type        = string
+  sensitive   = true
+}
+
+variable "authorized_users" {
+  description = "List of identities permitted to access the dashboard."
+  type        = list(string)
+  default     = []
+}
+
+variable "server_image" {
+  description = "Container image URL for the server component."
+  type        = string
+}
+
+variable "worker_image" {
+  description = "Container image URL for the worker component."
+  type        = string
+}
+
+variable "repo_name" {
+  description = "Name of the Artifact Registry repository."
+  type        = string
+  default     = "multi-agent-cra"
 }
 
 variable "cloud_run_server_name" {
-  description = "Name for the Cloud Run server service"
+  description = "Service name for the Cloud Run frontend."
   type        = string
   default     = "cra-server"
 }
 
 variable "cloud_run_worker_name" {
-  description = "Name for the Cloud Run worker service"
+  description = "Service name for the Cloud Run backend worker."
   type        = string
   default     = "cra-worker"
-}
-
-variable "gcs_bucket_name" {
-  description = "Name for the GCS bucket for code storage"
-  type        = string
-  default     = "" # If empty, a unique bucket will be created
-}
-
-variable "image_repository" {
-  description = "Container image repository (e.g., gcr.io/my-project/agent-cra)"
-  type        = string
-}
-
-variable "gemini_api_key" {
-  description = "The Gemini API Key"
-  type        = string
-  sensitive   = true
-}
-
-variable "db_version" {
-  description = "The version of the Cloud SQL PostgreSQL instance"
-  type        = string
-  default     = "POSTGRES_13"
-}
-
-variable "db_tier" {
-  description = "The tier for the Cloud SQL instance"
-  type        = string
-  default     = "db-g1-small"
-}
-
-variable "db_user" {
-  description = "The username for the Cloud SQL database"
-  type        = string
-  default     = "cra_user"
-}
-
-variable "db_password" {
-  description = "The password for the Cloud SQL database"
-  type        = string
-  sensitive   = true
-  default     = "change_me_in_production"
 }

@@ -1,9 +1,4 @@
-// Package queue provides pubsub.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
+// Package queue provides a wrapper for Google Cloud Pub/Sub operations.
 package queue
 
 import (
@@ -14,13 +9,13 @@ import (
 	"cloud.google.com/go/pubsub/v2"
 )
 
-// Client wraps the Google Cloud Pub/Sub client.
+// Client wraps the official Google Cloud Pub/Sub client for simplified interactions.
 type Client struct {
 	projectID string
 	client    *pubsub.Client
 }
 
-// NewClient initializes a new Pub/Sub client.
+// NewClient initializes and returns a connection to Google Cloud Pub/Sub.
 func NewClient(ctx context.Context, projectID string) (*Client, error) {
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
@@ -29,7 +24,7 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 	return &Client{projectID: projectID, client: client}, nil
 }
 
-// Publish sends a message to the specified topic.
+// Publish sends data to the specified Pub/Sub topic.
 func (c *Client) Publish(ctx context.Context, topicID string, data []byte) error {
 	t := c.client.Publisher(topicID)
 	result := t.Publish(ctx, &pubsub.Message{Data: data})
@@ -41,8 +36,8 @@ func (c *Client) Publish(ctx context.Context, topicID string, data []byte) error
 	return nil
 }
 
-// Subscribe listens for messages on the specified subscription.
-// It blocks until the context is cancelled.
+// Subscribe starts receiving messages from a subscription and executes the provided handler.
+// This is a blocking operation until the context is cancelled.
 func (c *Client) Subscribe(ctx context.Context, subID string, handler func(ctx context.Context, data []byte) error) error {
 	sub := c.client.Subscriber(subID)
 	slog.Info("Subscribing to topic", "subscription", subID)
@@ -57,7 +52,7 @@ func (c *Client) Subscribe(ctx context.Context, subID string, handler func(ctx c
 	})
 }
 
-// Close closes the underlying Pub/Sub client.
+// Close releases the underlying Pub/Sub client resources.
 func (c *Client) Close() error {
 	return c.client.Close()
 }

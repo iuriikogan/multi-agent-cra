@@ -2,7 +2,7 @@
 set -e
 
 PROJECT_ID=$(gcloud config get-value project)
-REGION="us-central1"
+REGION=${REGION:-europe-west1}
 BUCKET_NAME="tf-state-${PROJECT_ID}"
 
 echo "Configuring Terraform Backend for Project: $PROJECT_ID"
@@ -13,7 +13,7 @@ if ! gcloud storage buckets describe "gs://${BUCKET_NAME}" &>/dev/null; then
     gcloud storage buckets create "gs://${BUCKET_NAME}" --location="$REGION" --uniform-bucket-level-access
     
     # Enable versioning for state safety
-    gcloud storage buckets update "gs://${BUCKET_NAME}" --versioning
+    # gcloud storage buckets update "gs://${BUCKET_NAME}" --versioning
 else
     echo "Bucket ${BUCKET_NAME} already exists."
 fi
