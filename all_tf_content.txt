@@ -1,0 +1,766 @@
+# Package variables defines input parameters for the compliance system infrastructure.
+
+variable "project_id" {
+  description = "The target GCP project ID."
+  type        = string
+}
+
+variable "region" {
+  description = "The GCP region for deployment."
+  type        = string
+  default     = "europe-west1"
+}
+
+variable "db_password" {
+  description = "Password for the Cloud SQL database instance."
+  type        = string
+  sensitive   = true
+}
+
+variable "authorized_users" {
+  description = "List of identities permitted to access the dashboard."
+  type        = list(string)
+  default     = []
+}
+
+variable "server_image" {
+  description = "Container image URL for the server component."
+  type        = string
+}
+
+variable "worker_image" {
+  description = "Container image URL for the worker component."
+  type        = string
+}
+
+variable "repo_name" {
+  description = "Name of the Artifact Registry repository."
+  type        = string
+  default     = "multi-agent-cra"
+}
+
+variable "cloud_run_server_name" {
+  description = "Service name for the Cloud Run frontend."
+  type        = string
+  default     = "cra-server"
+}
+
+variable "cloud_run_worker_name" {
+  description = "Service name for the Cloud Run backend worker."
+  type        = string
+  default     = "cra-worker"
+}
+# Package cloud_run defines the serverless compute resources for the compliance system.
+
+resource "google_cloud_run_v2_service" "server" {
+  name     = var.cloud_run_server_name
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.server_sa.email
+    vpc_access {
+      connector = google_vpc_access_connector.connector.id
+      egress    = "ALL_TRAFFIC"
+    }
+    containers {
+      image = var.server_image
+      env {
+        name  = "PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "ROLE"
+        value = "server"
+      }
+      env {
+        name  = "DATABASE_TYPE"
+        value = "CLOUD_SQL"
+      }
+      env {
+        name  = "DATABASE_URL"
+        value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
+      }
+      env {
+        name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
+        value = google_pubsub_topic.scan_requests.name
+      }
+      env {
+        name  = "PUBSUB_SUB_SCAN_REQUESTS"
+        value = google_pubsub_subscription.scan_requests_sub.name
+      }
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "google_cloud_run_v2_service_iam_member" "server_invoker" {
+  for_each = toset(var.authorized_users)
+  name     = google_cloud_run_v2_service.server.name
+  location = google_cloud_run_v2_service.server.location
+  role     = "roles/run.invoker"
+  member   = each.value
+}
+
+resource "google_cloud_run_v2_service" "worker" {
+  name     = var.cloud_run_worker_name
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  template {
+    service_account = google_service_account.worker_sa.email
+    vpc_access {
+      connector = google_vpc_access_connector.connector.id
+      egress    = "ALL_TRAFFIC"
+    }
+    containers {
+      image = var.worker_image
+      env {
+        name  = "PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "ROLE"
+        value = "worker"
+      }
+      env {
+        name  = "DATABASE_TYPE"
+        value = "CLOUD_SQL"
+      }
+      env {
+        name  = "DATABASE_URL"
+        value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
+      }
+      env {
+        name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
+        value = google_pubsub_topic.scan_requests.name
+      }
+      env {
+        name  = "PUBSUB_SUB_SCAN_REQUESTS"
+        value = google_pubsub_subscription.scan_requests_sub.name
+      }
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+  }
+}# Package cloud_sql configures the managed database instance for findings storage.
+
+resource "google_sql_database_instance" "instance" {
+  name             = "cra-db-instance"
+  region           = var.region
+  database_version = "MYSQL_8_0"
+
+  depends_on = [google_service_networking_connection.private_vpc_connection]
+
+  settings {
+    tier = "db-f1-micro" # Minimum tier for cost optimization in dev/staging
+    ip_configuration {
+      ipv4_enabled    = false # Private IP only for enhanced security
+      private_network = google_compute_network.vpc.id
+    }
+  }
+  deletion_protection = false # Set to true for production environments
+}
+
+resource "google_sql_database" "database" {
+  name     = "cra_db"
+  instance = google_sql_database_instance.instance.name
+}
+
+resource "google_sql_user" "users" {
+  name     = "cra_user"
+  instance = google_sql_database_instance.instance.name
+  host     = "%" # Allow connections from any IP within the private VPC range
+  password = var.db_password
+}
+
+output "db_ip" {
+  description = "The private IP address of the Cloud SQL instance."
+  value       = google_sql_database_instance.instance.private_ip_address
+}# Package iam manages service accounts and permission bindings for the compliance agents.
+
+# ------------------------------------------------------------------------------
+# 1. Server Service Account
+# ------------------------------------------------------------------------------
+resource "google_service_account" "server_sa" {
+  account_id   = "cra-server-sa"
+  display_name = "Identity for the compliance dashboard server"
+}
+
+resource "google_project_iam_member" "server_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.server_sa.email}"
+}
+
+resource "google_project_iam_member" "server_sql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.server_sa.email}"
+}
+
+# ------------------------------------------------------------------------------
+# 2. Worker Service Account
+# ------------------------------------------------------------------------------
+resource "google_service_account" "worker_sa" {
+  account_id   = "cra-worker-sa"
+  display_name = "Identity for the compliance background worker"
+}
+
+resource "google_project_iam_member" "worker_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.worker_sa.email}"
+}
+
+resource "google_project_iam_member" "worker_sql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.worker_sa.email}"
+}
+
+resource "google_project_iam_member" "worker_ai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.worker_sa.email}"
+}
+
+resource "google_project_iam_member" "worker_asset_viewer" {
+  project = var.project_id
+  role    = "roles/cloudasset.viewer"
+  member  = "serviceAccount:${google_service_account.worker_sa.email}"
+}
+
+# ------------------------------------------------------------------------------
+# 3. Agent-Specific Service Accounts (Legacy/Specific Agents)
+# ------------------------------------------------------------------------------
+resource "google_service_account" "sa_classifier" {
+  account_id   = "sa-classifier"
+  display_name = "Agent: Scope Classifier"
+}
+
+resource "google_project_iam_member" "classifier_vertex" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.sa_classifier.email}"
+}
+
+resource "google_service_account" "sa_auditor" {
+  account_id   = "sa-auditor"
+  display_name = "Agent: Regulatory Auditor"
+}
+
+resource "google_project_iam_member" "auditor_vertex" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.sa_auditor.email}"
+}
+
+resource "google_service_account" "sa_vuln" {
+  account_id   = "sa-vuln"
+  display_name = "Agent: Vulnerability Watchdog"
+}
+
+resource "google_project_iam_member" "vuln_vertex" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.sa_vuln.email}"
+}
+
+resource "google_service_account" "sa_reporter" {
+  account_id   = "sa-reporter"
+  display_name = "Agent: Compliance Reporter"
+}
+
+resource "google_project_iam_member" "reporter_vertex" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.sa_reporter.email}"
+}# Enable Secret Manager and KMS APIs
+resource "google_project_service" "secretmanager" {
+  project            = var.project_id
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloudkms" {
+  project            = var.project_id
+  service            = "cloudkms.googleapis.com"
+  disable_on_destroy = false
+}
+
+# KMS Key Ring
+resource "google_kms_key_ring" "key_ring" {
+  name       = "cra-key-ring"
+  location   = var.region
+  project    = var.project_id
+  depends_on = [google_project_service.cloudkms]
+}
+
+# KMS Crypto Key
+resource "google_kms_crypto_key" "secret_key" {
+  name            = "gemini-api-key-encryption"
+  key_ring        = google_kms_key_ring.key_ring.id
+  purpose         = "ENCRYPT_DECRYPT"
+  rotation_period = "7776000s" # 90 days
+}
+
+# Grant Secret Manager Service Agent access to the KMS key
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+resource "google_project_service_identity" "secretmanager_agent" {
+  provider = google-beta
+  project  = data.google_project.project.project_id
+  service  = "secretmanager.googleapis.com"
+}
+
+resource "google_kms_crypto_key_iam_member" "sm_sa_encrypter_decrypter" {
+  crypto_key_id = google_kms_crypto_key.secret_key.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:${google_project_service_identity.secretmanager_agent.email}"
+}
+# loadbalancer.tf - Global External Application Load Balancer with Cloud Armor
+
+resource "google_compute_global_address" "default" {
+  name = "cra-dashboard-ip"
+}
+
+resource "google_compute_region_network_endpoint_group" "serverless_neg" {
+  name                  = "cra-server-neg"
+  network_endpoint_type = "SERVERLESS"
+  region                = var.region
+  cloud_run {
+    service = google_cloud_run_v2_service.server.name
+  }
+}
+
+resource "google_compute_backend_service" "default" {
+  name                  = "cra-backend"
+  protocol              = "HTTPS"
+  port_name             = "http"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  security_policy       = google_compute_security_policy.policy.name
+
+  backend {
+    group = google_compute_region_network_endpoint_group.serverless_neg.id
+  }
+}
+
+resource "google_compute_url_map" "default" {
+  name            = "cra-url-map"
+  default_service = google_compute_backend_service.default.id
+}
+
+resource "google_compute_target_http_proxy" "default" {
+  name    = "cra-http-proxy"
+  url_map = google_compute_url_map.default.id
+}
+
+resource "google_compute_global_forwarding_rule" "default" {
+  name                  = "cra-frontend-rule"
+  target                = google_compute_target_http_proxy.default.id
+  port_range            = "80"
+  ip_address            = google_compute_global_address.default.address
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+}
+
+resource "google_compute_security_policy" "policy" {
+  name        = "cra-security-policy"
+  description = "Basic security policy for CRA Dashboard"
+
+  rule {
+    action   = "deny(403)"
+    priority = "2147483647"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["*"]
+      }
+    }
+    description = "Default deny all"
+  }
+
+  rule {
+    action   = "allow"
+    priority = "1000"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["${chomp(data.http.myip.response_body)}/32"]
+      }
+    }
+    description = "Allow my IP"
+  }
+}
+
+data "http" "myip" {
+  url = "https://ipv4.icanhazip.com"
+}
+# Package main manages the enablement of Google Cloud APIs for the compliance system.
+
+resource "google_project_service" "apis" {
+  for_each = toset([
+    "run.googleapis.com",
+    "iam.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "sqladmin.googleapis.com",
+    "servicenetworking.googleapis.com",
+    "pubsub.googleapis.com",
+    "secretmanager.googleapis.com",
+    "vpcaccess.googleapis.com"
+  ])
+  service                    = each.key
+  disable_dependent_services = false
+  disable_on_destroy         = false
+}
+output "project_id" {
+  description = "Google Cloud Project ID"
+  value       = var.project_id
+}
+
+output "region" {
+  description = "Google Cloud Region"
+  value       = var.region
+}
+
+output "artifact_registry_repo" {
+  description = "Artifact Registry Docker Repository ID"
+  value       = google_artifact_registry_repository.cra_repo.repository_id
+}
+
+output "pubsub_scan_topic" {
+  description = "Pub/Sub Topic for Scan Requests"
+  value       = google_pubsub_topic.scan_requests.name
+}
+
+
+output "dashboard_public_url" {
+  description = "The public IP address to access the dashboard"
+  value       = "http://${google_compute_global_address.default.address}"
+}
+terraform {
+  required_version = ">= 1.5"
+
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">= 5.0"
+    }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = ">= 5.0"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
+  project = var.project_id
+  region  = var.region
+}
+
+data "google_client_config" "default" {}# Package pubsub configures messaging infrastructure for the multi-agent orchestration.
+
+resource "google_pubsub_topic" "scan_requests" {
+  name = "scan-requests" # Inbound scan triggers from the frontend
+}
+
+resource "google_pubsub_subscription" "scan_requests_sub" {
+  name  = "scan-requests-sub"
+  topic = google_pubsub_topic.scan_requests.name
+
+  push_config {
+    push_endpoint = "${google_cloud_run_v2_service.worker.uri}/pubsub/scan-requests"
+    oidc_token {
+      service_account_email = google_service_account.worker_sa.email
+    }
+  }
+}
+
+resource "google_pubsub_topic" "aggregator" {
+  name = "aggregator-topic" # Resource discovery tasks
+}
+
+resource "google_pubsub_topic" "modeler" {
+  name = "modeler-topic" # Compliance modeling tasks
+}
+
+resource "google_pubsub_topic" "validator" {
+  name = "validator-topic" # Rule validation tasks
+}
+
+resource "google_pubsub_topic" "reviewer" {
+  name = "reviewer-topic" # Assessment review tasks
+}
+
+resource "google_pubsub_topic" "tagger" {
+  name = "tagger-topic" # Resource tagging tasks
+}
+
+resource "google_pubsub_topic" "reporter" {
+  name = "reporter-topic" # Final report generation tasks
+}
+
+resource "google_pubsub_topic" "monitoring" {
+  name = "monitoring-topic" # Real-time execution events
+}
+# Enable Artifact Registry API
+resource "google_project_service" "artifactregistry" {
+  project            = var.project_id
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
+}
+
+data "google_project" "project_registry" {
+  project_id = var.project_id
+}
+
+# Create Artifact Registry Repository for Docker images
+resource "google_artifact_registry_repository" "cra_repo" {
+  location      = var.region
+  repository_id = "multi-agent-cra"
+  description   = "Docker repository for Multi-Agent CRA"
+  format        = "DOCKER"
+  depends_on    = [google_project_service.artifactregistry]
+}
+
+# Grant Artifact Registry Writer role to the default Compute Engine service account
+# This SA is used by Cloud Build by default
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_sa_writer" {
+  project    = var.project_id
+  location   = google_artifact_registry_repository.cra_repo.location
+  repository = google_artifact_registry_repository.cra_repo.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${data.google_project.project_registry.number}-compute@developer.gserviceaccount.com"
+}
+
+# Grant Logs Writer role to the default Compute Engine service account
+# This is required for Cloud Build to write logs
+resource "google_project_iam_member" "cloudbuild_sa_logging" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${data.google_project.project_registry.number}-compute@developer.gserviceaccount.com"
+}# Package secrets manages sensitive information using Google Secret Manager.
+
+# google_secret_manager_secret.gemini_api_key defines the secret container.
+# Access is managed via IAM to ensure only authorized services can retrieve the values.
+resource "google_secret_manager_secret" "gemini_api_key" {
+  secret_id = "GEMINI_API_KEY"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+}
+
+# IAM bindings for the Gemini API Key.
+# Both server and worker identities require access to retrieve the key at runtime.
+
+resource "google_secret_manager_secret_iam_member" "server_access" {
+  secret_id = google_secret_manager_secret.gemini_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.server_sa.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "worker_access" {
+  secret_id = google_secret_manager_secret.gemini_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.worker_sa.email}"
+}
+
+# Legacy agent-specific access (optional, depending on deployment mode).
+resource "google_secret_manager_secret_iam_member" "classifier_access" {
+  secret_id = google_secret_manager_secret.gemini_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.sa_classifier.email}"
+}
+# Cloud Armor Security Policy (Model Armor Implementation)
+resource "google_compute_security_policy" "agent_armor" {
+  name = "agent-armor-policy"
+
+  # Rule 1: Allow specific traffic
+  rule {
+    action   = "allow"
+    priority = "1000"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["*"]
+      }
+    }
+    description = "Allow access"
+  }
+
+  # Rule 2: SQL Injection Protection
+  rule {
+    action   = "deny(403)"
+    priority = "900"
+    match {
+      expr {
+        expression = "evaluatePreconfiguredExpr('sqli-v33-stable')"
+      }
+    }
+    description = "Block SQL Injection"
+  }
+
+  # Rule 3: Cross-Site Scripting Protection
+  rule {
+    action   = "deny(403)"
+    priority = "901"
+    match {
+      expr {
+        expression = "evaluatePreconfiguredExpr('xss-v33-stable')"
+      }
+    }
+    description = "Block XSS"
+  }
+
+  # Rule 4: Model Armor / LLM Protection (Placeholder)
+  # In a real Model Armor setup, this would reference specific AI protection rulesets
+  # typically available in Cloud Armor Enterprise.
+  # For now, we simulate this with a rule blocking known malicious prompts if signatures were available.
+  rule {
+    action   = "deny(403)"
+    priority = "800"
+    match {
+      expr {
+        expression = "evaluatePreconfiguredExpr('cve-canary')" # Placeholder for AI exploit rules
+      }
+    }
+        description = "Block AI Exploits (Model Armor)"
+      }
+    
+      # Default Rule (Required)
+      rule {
+        action   = "deny(403)"
+        priority = "2147483647"
+        match {
+          versioned_expr = "SRC_IPS_V1"
+          config {
+            src_ip_ranges = ["*"]
+          }
+        }
+        description = "Default deny all"
+      }
+    }
+    # Package variables defines input parameters for the compliance system infrastructure.
+
+variable "project_id" {
+  description = "The target GCP project ID."
+  type        = string
+}
+
+variable "region" {
+  description = "The GCP region for deployment."
+  type        = string
+  default     = "europe-west1"
+}
+
+variable "db_password" {
+  description = "Password for the Cloud SQL database instance."
+  type        = string
+  sensitive   = true
+}
+
+variable "authorized_users" {
+  description = "List of identities permitted to access the dashboard."
+  type        = list(string)
+  default     = []
+}
+
+variable "server_image" {
+  description = "Container image URL for the server component."
+  type        = string
+}
+
+variable "worker_image" {
+  description = "Container image URL for the worker component."
+  type        = string
+}
+
+variable "repo_name" {
+  description = "Name of the Artifact Registry repository."
+  type        = string
+  default     = "multi-agent-cra"
+}
+
+variable "cloud_run_server_name" {
+  description = "Service name for the Cloud Run frontend."
+  type        = string
+  default     = "cra-server"
+}
+
+variable "cloud_run_worker_name" {
+  description = "Service name for the Cloud Run backend worker."
+  type        = string
+  default     = "cra-worker"
+}
+# Package vpc defines the network topology and serverless connectivity for the system.
+
+resource "google_compute_network" "vpc" {
+  name                    = "cra-vpc"
+  auto_create_subnetworks = false # Custom subnetting for better control
+}
+
+resource "google_compute_subnetwork" "default" {
+  name          = "cra-subnet"
+  ip_cidr_range = "10.0.0.0/24"
+  network       = google_compute_network.vpc.id
+  region        = var.region
+
+  log_config {
+    aggregation_interval = "INTERVAL_10_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
+}
+
+resource "google_vpc_access_connector" "connector" {
+  name          = "cra-connector"
+  region        = var.region
+  ip_cidr_range = "10.8.0.0/28" # Small range is sufficient for serverless egress
+  network       = google_compute_network.vpc.id
+  min_instances = 2
+  max_instances = 3
+
+  depends_on = [google_project_service.apis]
+}
+
+# google_compute_global_address reserves an internal IP range for Private Service Connect.
+resource "google_compute_global_address" "private_ip_address" {
+  name          = "private-ip-for-sql"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc.id
+}
+
+# google_service_networking_connection establishes peering between the VPC and Google services.
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.vpc.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
+}
