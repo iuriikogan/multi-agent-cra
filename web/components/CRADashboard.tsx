@@ -98,9 +98,11 @@ export default function CRADashboard() {
   // or simpler forms like: organizations/123/folders/456/projects/my-proj/...
   // or even just projects/my-proj.
   const extractHierarchy = (resourceName: string) => {
+    if (!resourceName) return { org: 'Unknown', folder: 'Unknown', proj: 'Unknown' };
     const parts = resourceName.split('/');
     let org = 'Unknown', folder = 'Unknown', proj = 'Unknown';
     
+    // Support for standard GCP resource paths
     const orgIdx = parts.indexOf('organizations');
     if (orgIdx !== -1 && orgIdx + 1 < parts.length) org = parts[orgIdx + 1];
     
@@ -110,9 +112,14 @@ export default function CRADashboard() {
     const projIdx = parts.indexOf('projects');
     if (projIdx !== -1 && projIdx + 1 < parts.length) proj = parts[projIdx + 1];
     
-    // Fallback if the path is just "projects/xyz"
-    if (resourceName.startsWith('projects/') && proj === 'Unknown') {
-       proj = resourceName.split('/')[1];
+    // Fallback if the path is simpler like "projects/xyz" or just a name
+    if (proj === 'Unknown') {
+      if (resourceName.startsWith('projects/')) {
+        proj = resourceName.split('/')[1];
+      } else if (parts.length > 0) {
+        // Just use the first part as a project guess if it looks like a project id
+        proj = parts[0];
+      }
     }
 
     return { org, folder, proj };
@@ -135,8 +142,14 @@ export default function CRADashboard() {
 
   // Chart data for the Doughnut chart, providing a high-level summary of compliance status.
   // The 'Other' category captures findings with statuses that are neither strictly compliant nor non-compliant.
-  const compliantCount = filteredFindings.filter(f => f.status.toLowerCase() === 'compliant' || f.status.toLowerCase() === 'true').length;
-  const nonCompliantCount = filteredFindings.filter(f => f.status.toLowerCase() === 'non-compliant' || f.status.toLowerCase() === 'false' || f.status.toLowerCase() === 'failed').length;
+  const compliantCount = filteredFindings.filter(f => {
+    const s = f.status.toLowerCase();
+    return s === 'compliant' || s === 'true' || s === 'approved';
+  }).length;
+  const nonCompliantCount = filteredFindings.filter(f => {
+    const s = f.status.toLowerCase();
+    return s === 'non-compliant' || s === 'false' || s === 'failed' || s === 'rejected';
+  }).length;
   const otherCount = filteredFindings.length - compliantCount - nonCompliantCount;
 
   const chartData = {
@@ -242,7 +255,8 @@ export default function CRADashboard() {
                       <TableCell>
                         <Chip 
                           label={f.status} 
-                          color={f.status.toLowerCase() === 'compliant' || f.status.toLowerCase() === 'true' ? 'success' : 'error'} 
+                          color={(f.status.toLowerCase() === 'compliant' || f.status.toLowerCase() === 'true' || f.status.toLowerCase() === 'approved') ? 'success' :
+                            (f.status.toLowerCase() === 'non-compliant' || f.status.toLowerCase() === 'false' || f.status.toLowerCase() === 'failed' || f.status.toLowerCase() === 'rejected') ? 'error' : 'default'} 
                           size="small" 
                         />
                       </TableCell>

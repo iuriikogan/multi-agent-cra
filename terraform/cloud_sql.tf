@@ -50,7 +50,7 @@ resource "google_sql_database_instance" "main" {
       value = "on"
     }
   }
-  deletion_protection = false # Set to true for production environments
+  deletion_protection = true
 
   depends_on = [google_project_service.apis, google_service_networking_connection.private_vpc_connection]
 }

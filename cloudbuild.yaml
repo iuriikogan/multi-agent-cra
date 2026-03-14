@@ -46,7 +46,32 @@ steps:
     waitFor: ['Build Worker']
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}']
 
-  # Deploy Worker Service (Push Webhook)
+  # Deploy Server Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Server'
+    waitFor: ['Push Server']
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cra-server'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
+      - '--region'
+      - '${_REGION}'
+      - '--service-account'
+      - 'sa-reporter@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--vpc-connector'
+      - 'cra-connector'
+      - '--set-env-vars'
+      - 'PROJECT_ID=${PROJECT_ID},ROLE=server,DATABASE_TYPE=CLOUD_SQL'
+      - '--set-env-vars'
+      - 'DATABASE_URL=host=${_DB_IP} port=5432 user=cra_user password=change_me_in_production dbname=cra_db sslmode=require'
+      - '--set-secrets'
+      - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
+      - '--allow-unauthenticated'
+
+  # Deploy Worker Service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Worker'
     waitFor: ['Push Worker']
@@ -59,28 +84,25 @@ steps:
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
       - '--region'
       - '${_REGION}'
+      - '--service-account'
+      - 'sa-classifier@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--vpc-connector'
+      - 'cra-connector'
       - '--set-env-vars'
-      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID},ROLE=worker,MODEL_AGGREGATOR=${_MODEL_AGGREGATOR},MODEL_MODELER=${_MODEL_MODELER},MODEL_VALIDATOR=${_MODEL_VALIDATOR},MODEL_REVIEWER=${_MODEL_REVIEWER},MODEL_TAGGER=${_MODEL_TAGGER},MODEL_REPORTER=${_MODEL_REPORTER}'
+      - 'PROJECT_ID=${PROJECT_ID},LOG_LEVEL=INFO,GCS_BUCKET_NAME=cra-data-${PROJECT_ID},ROLE=worker'
+      - '--set-env-vars'
+      - 'DATABASE_URL=host=${_DB_IP} port=5432 user=cra_user password=change_me_in_production dbname=cra_db sslmode=require'
       - '--set-env-vars'
       - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
-      # Require authentication for Pub/Sub push requests
       - '--no-allow-unauthenticated'
-      # Allow scaling to 0, no CPU allocation when idle required anymore!
-      - '--min-instances'
-      - '0'
 
 substitutions:
   _REGION: europe-west1
   _REPO_NAME: multi-agent-cra
   _TAG: latest
-  _MODEL_AGGREGATOR: gemini-2.5-flash
-  _MODEL_MODELER: gemini-2.5-pro
-  _MODEL_VALIDATOR: gemini-2-pro
-  _MODEL_REVIEWER: gemini-2.5-pro
-  _MODEL_TAGGER: gemini-2.5-pro 
-  _MODEL_REPORTER: gemini-2.5-pro
+  _DB_IP: 10.0.0.3
 
 options:
   machineType: 'E2_HIGHCPU_8'

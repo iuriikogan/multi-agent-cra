@@ -27,8 +27,13 @@ variable "gcs_bucket_name" {
   default     = "" # If empty, a unique bucket will be created
 }
 
-variable "image_repository" {
-  description = "Container image repository (e.g., gcr.io/my-project/agent-cra)"
+variable "server_image" {
+  description = "Container image for the server service"
+  type        = string
+}
+
+variable "worker_image" {
+  description = "Container image for the worker service"
   type        = string
 }
 

@@ -57,8 +57,9 @@ Before deploying the application locally or in production, ensure the following 
 *   Google Cloud Platform project with billing enabled.
 *   Valid Google Cloud credentials configured (`gcloud auth application-default login`).
 *   Go 1.25 or higher installed.
+*   Terraform installed.
 *   A valid Gemini API Key.
-*   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com.
+*   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com, sqladmin.googleapis.com.
 
 ## Steps
 
@@ -78,11 +79,13 @@ Before deploying the application locally or in production, ensure the following 
 
 ### Cloud Run Deployment
 
-For production deployments to Google Cloud Run, execute the build script:
+For production deployments to Google Cloud Run, execute the unified build script which orchestrates Terraform and Cloud Build:
 
 ```bash
 ./build.sh
 ```
+
+This will automatically provision your VPC, Cloud SQL instance, IAM roles, and deploy the services.
 
 ## Verification
 

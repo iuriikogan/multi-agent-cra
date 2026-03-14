@@ -113,9 +113,15 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate stats
-  const compliantCount = scanResult?.findings.filter(f => f.status === 'true' || f.status === 'Compliant').length || 0;
-  const nonCompliantCount = scanResult?.findings.filter(f => f.status === 'false' || f.status === 'Non-Compliant').length || 0;
+  // Calculate stats using case-insensitive comparison for cross-agent compatibility
+  const compliantCount = scanResult?.findings.filter(f => {
+    const s = f.status.toLowerCase();
+    return s === 'true' || s === 'compliant' || s === 'approved';
+  }).length || 0;
+  const nonCompliantCount = scanResult?.findings.filter(f => {
+    const s = f.status.toLowerCase();
+    return s === 'false' || s === 'non-compliant' || s === 'failed' || s === 'rejected';
+  }).length || 0;
   
   const chartData = {
     labels: ['Compliant', 'Non-Compliant'],
@@ -211,7 +217,14 @@ export default function Dashboard() {
                       {scanResult.findings.map((f, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{f.resource_name}</TableCell>
-                          <TableCell><Chip label={f.status} color={f.status === 'true' || f.status === 'Compliant' ? 'success' : 'error'} size="small" /></TableCell>
+                          <TableCell>
+                            <Chip
+                              label={f.status}
+                              color={(f.status.toLowerCase() === 'true' || f.status.toLowerCase() === 'compliant' || f.status.toLowerCase() === 'approved') ? 'success' :
+                                (f.status.toLowerCase() === 'false' || f.status.toLowerCase() === 'non-compliant' || f.status.toLowerCase() === 'failed' || f.status.toLowerCase() === 'rejected') ? 'error' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
                           <TableCell>{f.details}</TableCell>
                         </TableRow>
                       ))}

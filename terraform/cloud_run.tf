@@ -12,13 +12,14 @@ resource "google_cloud_run_v2_service" "server" {
       max_instance_count = 5
     }
 
+    service_account = google_service_account.sa_reporter.email
     vpc_access {
       connector = google_vpc_access_connector.serverless.id
       egress    = "ALL_TRAFFIC"
     }
     
     containers {
-      image = var.image_repository
+      image = var.server_image
       ports {
         container_port = 8080
       }
@@ -69,13 +70,14 @@ resource "google_cloud_run_v2_service" "worker" {
       max_instance_count = 10
     }
 
+    service_account = google_service_account.sa_reporter.email
     vpc_access {
       connector = google_vpc_access_connector.serverless.id
       egress    = "ALL_TRAFFIC"
     }
 
     containers {
-      image = var.image_repository
+      image = var.worker_image
       # No port exposed for the worker
       env {
         name = "GEMINI_API_KEY"

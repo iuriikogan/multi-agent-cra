@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
@@ -168,11 +169,28 @@ func ProcessReporting(ctx context.Context, a agent.Agent, task *AgentTask) error
 	if err != nil {
 		return err
 	}
+	
+	cleanReport := sanitizeJSON(report)
+
 	var finding store.Finding
-	if err := json.Unmarshal([]byte(report), &finding); err != nil {
-		return fmt.Errorf("failed to unmarshal finding from report: %w", err)
+	if err := json.Unmarshal([]byte(cleanReport), &finding); err != nil {
+		return fmt.Errorf("failed to unmarshal finding from report: %w (raw report: %s)", err, report)
 	}
 	task.Result.ApprovalStatus = finding.Status
 	task.Result.ComplianceReport = finding.Details
 	return nil
+}
+
+// sanitizeJSON removes markdown code block backticks and other common non-JSON noise 
+// often returned by LLMs to ensure strict JSON unmarshaling succeeds.
+func sanitizeJSON(input string) string {
+	res := strings.TrimSpace(input)
+	if strings.HasPrefix(res, "```json") {
+		res = strings.TrimPrefix(res, "```json")
+		res = strings.TrimSuffix(res, "```")
+	} else if strings.HasPrefix(res, "```") {
+		res = strings.TrimPrefix(res, "```")
+		res = strings.TrimSuffix(res, "```")
+	}
+	return strings.TrimSpace(res)
 }
