@@ -10,7 +10,8 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   Real-time Dashboard: A Next.js frontend embedded in the Go binary featuring live Server-Sent Events (SSE) log streaming and interactive compliance charts.
 *   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
   
-## System Architecture and Data Flow
+## High-Level System Architecture and Data Flow
+#####    (Detailed Architecture can be found in ARCHITECTURE.md)
 
 The system uses a strictly decoupled producer-consumer model:
 
