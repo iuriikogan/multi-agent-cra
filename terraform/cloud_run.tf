@@ -30,6 +30,14 @@ resource "google_cloud_run_v2_service" "server" {
         value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
       }
       env {
+        name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
+        value = google_pubsub_topic.scan_requests.name
+      }
+      env {
+        name  = "PUBSUB_SUB_SCAN_REQUESTS"
+        value = google_pubsub_subscription.scan_requests_sub.name
+      }
+      env {
         name = "GEMINI_API_KEY"
         value_source {
           secret_key_ref {
@@ -78,6 +86,14 @@ resource "google_cloud_run_v2_service" "worker" {
       env {
         name  = "DATABASE_URL"
         value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
+      }
+      env {
+        name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
+        value = google_pubsub_topic.scan_requests.name
+      }
+      env {
+        name  = "PUBSUB_SUB_SCAN_REQUESTS"
+        value = google_pubsub_subscription.scan_requests_sub.name
       }
       env {
         name = "GEMINI_API_KEY"

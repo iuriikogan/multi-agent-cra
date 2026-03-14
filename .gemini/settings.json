@@ -1,0 +1,18 @@
+{
+  "ui": {
+    "showMemoryUsage": true
+  },
+  "general": {
+    "enablePromptCompletion": true
+  },
+  "experimental": {
+    "plan": true
+  },
+  "security": {
+    "environmentVariableRedaction": {
+      "enabled": true
+    },
+    "blockGitExtensions": true,
+    "disableYoloMode": true
+  }
+}

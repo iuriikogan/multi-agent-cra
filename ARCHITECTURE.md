@@ -2,7 +2,48 @@
 
 This document describes the technical architecture of the Multi-Agent Cyber Resilience Act (CRA) Compliance System.
 
-## High-Level Deployment Architecture
+## Deployment Options
+
+The system can be deployed using one of two mutually exclusive deployment paths. Both options deploy identical Cloud Run configurations (service accounts, VPC connectors, internal ingress for workers, pub/sub settings).
+
+### Option A: Cloud Build (Application-Focused)
+
+This option uses the `build.sh` script to trigger `cloudbuild.yaml`. It is ideal for rapid application updates and assumes that the underlying GCP infrastructure (VPC, Cloud SQL, Pub/Sub, Service Accounts) has already been provisioned.
+
+```mermaid
+sequenceDiagram
+    participant Developer
+    participant BuildScript as build.sh
+    participant CloudBuild as Google Cloud Build
+    participant ArtifactRegistry as Artifact Registry
+    participant CloudRun as Google Cloud Run
+
+    Developer->>BuildScript: Execute
+    BuildScript->>CloudBuild: gcloud builds submit
+    CloudBuild->>CloudBuild: Build Docker Images (Server & Worker)
+    CloudBuild->>ArtifactRegistry: Push Images
+    CloudBuild->>CloudRun: gcloud run deploy (Server & Worker)
+    Note over CloudRun: Connects to existing DB, VPC, and Pub/Sub
+```
+
+### Option B: Terraform (Infrastructure as Code)
+
+This option uses Terraform to provision the entire GCP environment (Networking, DB, Pub/Sub, IAM) alongside the Cloud Run services from scratch in a declarative manner.
+
+```mermaid
+sequenceDiagram
+    participant Developer
+    participant Terraform
+    participant GCP_Infra as GCP Infrastructure (VPC, SQL, IAM)
+    participant CloudRun as Google Cloud Run
+
+    Developer->>Terraform: terraform apply
+    Terraform->>GCP_Infra: Provision Networking, Databases, and Secrets
+    Terraform->>CloudRun: Deploy Server & Worker Services
+    Note over CloudRun: Cloud Run services pull pre-built images or rely on CI/CD
+```
+
+## High-Level System Architecture
 
 The system is deployed as a single compiled Go binary that adapts its behavior based on the `ROLE` environment variable, enabling independent scaling of the API/UI and background processing workloads on Google Cloud Run.
 
@@ -82,17 +123,17 @@ sequenceDiagram
 
 1.  **Secure Configuration Management:** No secrets (API keys, DB credentials) are stored in code or configuration files. They are injected exclusively via environment variables at runtime, sourced from Google Secret Manager.
 2.  **Least Privilege Execution (Identity-Based Security):**
-    *   The system uses dedicated Google Service Accounts (defined in `iam.tf`) for different agent stages:
-        *   `sa-classifier`: Aggregation and scoping.
-        *   `sa-auditor`: Regulatory auditing.
-        *   `sa-vuln`: Vulnerability analysis.
-        *   `sa-reporter`: Final compliance reporting and database writes.
+    *   The system uses dedicated Google Service Accounts (defined in `iam.tf`) for different stages:
+        *   `cra-server-sa`: Used by the API/UI server with access to Cloud SQL and Secrets.
+        *   `cra-worker-sa`: Used by the background worker with access to Vertex AI, Cloud Asset API, Cloud SQL, and Secrets.
+        *   Agent-Specific Accounts (`sa-classifier`, `sa-auditor`, `sa-vuln`, `sa-reporter`): Available for fine-grained execution where individual agents run in isolated contexts.
     *   **Pub/Sub Push Authentication**: All internal agent communication uses Pub/Sub **Push Subscriptions** with OIDC token authentication. The worker services validate these tokens, ensuring that only the authorized Pub/Sub service can trigger agent logic.
 3.  **Network Isolation:** 
     *   **Private Cloud SQL**: The PostgreSQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
     *   **Serverless VPC Access**: Cloud Run services use a dedicated VPC Connector to securely reach the private database.
 4.  **Ingress Protection:**
-    *   Google Cloud Armor provides WAF and DDoS protection.
+    *   The **Worker Fleet** is configured with `ingress = internal`, preventing direct access from the public internet.
+    *   The **Server** is accessible publicly but protected by Google Cloud Armor (WAF and DDoS protection).
     *   **Model Armor** integration inspects incoming requests for prompt injection or jailbreak attempts before they reach the Gemini AI agents.
 
 ## State Management
