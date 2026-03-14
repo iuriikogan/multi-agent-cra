@@ -25,7 +25,7 @@ The system uses a strictly decoupled producer-consumer model:
 
 ### Security Controls
 *   Least Privilege: Workers operate using dedicated Google Service Accounts with minimal permissions required for Asset Inventory and Pub/Sub.
-*   No Hardcoded Secrets: API keys and Database URLs are injected securely at runtime via environment variables (Factor III).
+*   No Hardcoded Secrets: API keys and Database URLs are injected securely at runtime via environment variables.
 *   Network Isolation: Cloud SQL instances should be deployed with private IPs. The cra-worker does not expose any inbound ports.
 
 ## Project Structure
@@ -56,7 +56,7 @@ Before deploying the application locally or in production, ensure the following 
 
 *   Google Cloud Platform project with billing enabled.
 *   Valid Google Cloud credentials configured (`gcloud auth application-default login`).
-*   Go 1.225 or higher installed.
+*   Go 1.25 or higher installed.
 *   A valid Gemini API Key.
 *   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com.
 
