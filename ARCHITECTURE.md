@@ -170,7 +170,7 @@ sequenceDiagram
         *   Agent-Specific Accounts (`sa-classifier`, `sa-auditor`, `sa-vuln`, `sa-reporter`): Available for fine-grained execution where individual agents run in isolated contexts.
     *   **Pub/Sub Push Authentication**: All internal agent communication uses Pub/Sub **Push Subscriptions** with OIDC token authentication. The worker services validate these tokens, ensuring that only the authorized Pub/Sub service can trigger agent logic.
 3.  **Network Isolation:** 
-    *   **Private Cloud SQL**: The PostgreSQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
+    *   **Private Cloud SQL**: The mySQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
     *   **Serverless VPC Access**: Cloud Run services use a dedicated VPC Connector to securely reach the private database.
 4.  **Ingress Protection:**
     *   The **Worker Fleet** is configured with `ingress = internal`, preventing direct access from the public internet.
