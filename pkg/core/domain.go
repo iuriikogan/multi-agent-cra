@@ -32,6 +32,7 @@ type AssessmentResult struct {
 	ApprovalStatus   string
 	Tags             string
 	Status           string // Overall status (Compliant/Non-Compliant)
+	Regulation       string // CRA or DORA
 
 	Error error
 }

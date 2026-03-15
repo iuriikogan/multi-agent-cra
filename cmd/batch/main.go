@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -15,6 +17,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/internal/batch"
 	"github.com/iuriikogan/multi-agent-cra/pkg/config"
 	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
+	"github.com/iuriikogan/multi-agent-cra/pkg/observability"
 )
 
 // main initializes dependencies and executes the batch analysis workflow.
@@ -36,8 +39,14 @@ func main() {
 
 	flag.Parse()
 
-	logger.Setup(*logLevel)
-	ctx := context.Background()
+	logger.Setup(*logLevel, cfg.ProjectID)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := observability.InitTrace(ctx, cfg.ProjectID); err != nil {
+		slog.Error("Failed to initialize tracing", "error", err)
+	}
+	defer observability.Shutdown(context.Background())
 
 	go func() {
 		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

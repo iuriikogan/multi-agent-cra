@@ -12,8 +12,15 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-//go:embed cra_kb.json
+//go:embed cra_kb.json dora_kb.json
 var f embed.FS
+
+type Regulation string
+
+const (
+	RegulationCRA  Regulation = "CRA"
+	RegulationDORA Regulation = "DORA"
+)
 
 // Chunk represents a single piece of text and its vector embedding.
 type Chunk struct {
@@ -22,23 +29,40 @@ type Chunk struct {
 	Score     float32   `json:"score,omitempty"`
 }
 
-var knowledgeBase []Chunk
+var knowledgeBases = make(map[Regulation][]Chunk)
 
-// Init loads the embedded knowledge base into memory.
+// Init loads the embedded knowledge bases into memory.
 func Init() error {
-	data, err := f.ReadFile("cra_kb.json")
-	if err != nil {
-		return fmt.Errorf("failed to read embedded cra_kb.json: %w", err)
+	if err := loadKB(RegulationCRA, "cra_kb.json"); err != nil {
+		return err
 	}
-	return json.Unmarshal(data, &knowledgeBase)
+	return loadKB(RegulationDORA, "dora_kb.json")
 }
 
-// Search performs a cosine similarity search against the knowledge base for the given query.
-func Search(ctx context.Context, client *genai.Client, query string, topN int) ([]Chunk, error) {
-	if len(knowledgeBase) == 0 {
+func loadKB(reg Regulation, filename string) error {
+	data, err := f.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("failed to read embedded %s: %w", filename, err)
+	}
+	var kb []Chunk
+	if err := json.Unmarshal(data, &kb); err != nil {
+		return fmt.Errorf("failed to unmarshal %s: %w", filename, err)
+	}
+	knowledgeBases[reg] = kb
+	return nil
+}
+
+// Search performs a cosine similarity search against the specified knowledge base for the given query.
+func Search(ctx context.Context, client *genai.Client, query string, reg Regulation, topN int) ([]Chunk, error) {
+	if len(knowledgeBases[reg]) == 0 {
 		if err := Init(); err != nil {
 			return nil, err
 		}
+	}
+
+	kb := knowledgeBases[reg]
+	if len(kb) == 0 {
+		return nil, fmt.Errorf("knowledge base for %s is empty or not found", reg)
 	}
 
 	if client == nil {
@@ -52,8 +76,8 @@ func Search(ctx context.Context, client *genai.Client, query string, topN int) (
 	}
 
 	queryEmb := res.Embedding.Values
-	results := make([]Chunk, len(knowledgeBase))
-	copy(results, knowledgeBase)
+	results := make([]Chunk, len(kb))
+	copy(results, kb)
 
 	for i := range results {
 		results[i].Score = cosineSimilarity(queryEmb, results[i].Embedding)

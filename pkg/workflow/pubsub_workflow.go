@@ -21,7 +21,8 @@ type AgentTask struct {
 	JobID    string                `json:"job_id"`   // Unique ID for the scan job
 	Scope    string                `json:"scope"`    // Resource scope being assessed
 	Resource core.GCPResource      `json:"resource"` // Target resource details
-	Result   core.AssessmentResult `json:"result"`   // Cumulative results from agents
+	Result     core.AssessmentResult `json:"result"`   // Cumulative results from agents
+	Regulation string                `json:"regulation"` // CRA or DORA
 }
 
 // PubSubWorkflow manages agent task distribution and status monitoring via Pub/Sub.
@@ -92,6 +93,7 @@ func (w *PubSubWorkflow) RegisterPushHandler(mux *http.ServeMux, pattern string,
 				ResourceName: task.Resource.Name,
 				Status:       fmt.Sprintf("%v", task.Result.ApprovalStatus),
 				Details:      task.Result.ComplianceReport,
+				Regulation:   task.Regulation,
 			}
 			if err := w.db.AddFinding(ctx, task.JobID, finding); err != nil {
 				slog.Error("Failed to save final finding", "error", err)
@@ -129,21 +131,21 @@ func (w *PubSubWorkflow) emitMonitoring(ctx context.Context, jobID, resourceName
 
 // ProcessAggregation simulates resource discovery and data gathering.
 func ProcessAggregation(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	prompt := fmt.Sprintf("Ingest configuration and IAM policies for GCP resource: %s (Type: %s, Project: %s)", task.Resource.Name, task.Resource.Type, task.Resource.ProjectID)
+	prompt := fmt.Sprintf("Ingest configuration and IAM policies for GCP resource: %s (Type: %s, Project: %s) for %s compliance", task.Resource.Name, task.Resource.Type, task.Resource.ProjectID, task.Regulation)
 	_, err := a.Chat(ctx, prompt)
 	return err
 }
 
 // ProcessModeling generates a compliance model for the resource via the LLM agent.
 func ProcessModeling(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	model, err := a.Chat(ctx, fmt.Sprintf("Model CRA compliance for GCP resource: %s", task.Resource.Name))
+	model, err := a.Chat(ctx, fmt.Sprintf("Model %s compliance for GCP resource: %s", task.Regulation, task.Resource.Name))
 	task.Result.ComplianceModel = model
 	return err
 }
 
 // ProcessValidation generates a detailed compliance report based on the model.
 func ProcessValidation(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	report, err := a.Chat(ctx, fmt.Sprintf("Validate CRA compliance for model: %s", task.Result.ComplianceModel))
+	report, err := a.Chat(ctx, fmt.Sprintf("Validate %s compliance for model: %s", task.Regulation, task.Result.ComplianceModel))
 	task.Result.ComplianceReport = report
 	return err
 }
@@ -164,7 +166,7 @@ func ProcessTagging(ctx context.Context, a agent.Agent, task *AgentTask) error {
 
 // ProcessReporting converts agent output into a structured finding object.
 func ProcessReporting(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	report, err := a.Chat(ctx, fmt.Sprintf("Generate a CRA compliance report for resource: %s, with compliance status: %s and details: %s", task.Resource.Name, task.Result.ApprovalStatus, task.Result.ComplianceReport))
+	report, err := a.Chat(ctx, fmt.Sprintf("Generate a %s compliance report for resource: %s, with compliance status: %s and details: %s", task.Regulation, task.Resource.Name, task.Result.ApprovalStatus, task.Result.ComplianceReport))
 	if err != nil {
 		return err
 	}
@@ -175,6 +177,7 @@ func ProcessReporting(ctx context.Context, a agent.Agent, task *AgentTask) error
 	if err := json.Unmarshal([]byte(cleanReport), &finding); err != nil {
 		return fmt.Errorf("failed to unmarshal finding from report: %w (raw report: %s)", err, report)
 	}
+	finding.Regulation = task.Regulation
 	task.Result.ApprovalStatus = finding.Status
 	task.Result.ComplianceReport = finding.Details
 	return nil

@@ -16,6 +16,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/internal/worker"
 	"github.com/iuriikogan/multi-agent-cra/pkg/config"
 	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
+	"github.com/iuriikogan/multi-agent-cra/pkg/observability"
 	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
 )
@@ -25,10 +26,15 @@ var staticAssets embed.FS
 
 func main() {
 	cfg := config.Load()
-	logger.Setup(cfg.LogLevel)
+	logger.Setup(cfg.LogLevel, cfg.ProjectID)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if err := observability.InitTrace(ctx, cfg.ProjectID); err != nil {
+		slog.Error("Failed to initialize tracing", "error", err)
+	}
+	defer observability.Shutdown(context.Background())
 
 	role := os.Getenv("ROLE")
 	if role == "" {

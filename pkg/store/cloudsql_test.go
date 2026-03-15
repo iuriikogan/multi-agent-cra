@@ -24,10 +24,10 @@ func TestCloudSQLStore(t *testing.T) {
 
 	// Test CreateScan
 	mock.ExpectExec("INSERT IGNORE INTO scans").
-		WithArgs(jobID, scope, "running").
+		WithArgs(jobID, scope, "running", "CRA").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	if err := s.CreateScan(ctx, jobID, scope); err != nil {
+	if err := s.CreateScan(ctx, jobID, scope, "CRA"); err != nil {
 		t.Errorf("CreateScan failed: %v", err)
 	}
 
@@ -45,9 +45,10 @@ func TestCloudSQLStore(t *testing.T) {
 		ResourceName: "res1",
 		Status:       "compliant",
 		Details:      "all good",
+		Regulation:   "CRA",
 	}
 	mock.ExpectExec("INSERT INTO findings").
-		WithArgs(jobID, finding.ResourceName, finding.Status, sqlmock.AnyArg()).
+		WithArgs(jobID, finding.ResourceName, finding.Status, sqlmock.AnyArg(), finding.Regulation).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	if err := s.AddFinding(ctx, jobID, finding); err != nil {
@@ -55,15 +56,15 @@ func TestCloudSQLStore(t *testing.T) {
 	}
 
 	// Test GetScan
-	mock.ExpectQuery("SELECT job_id, scope, status, created_at, completed_at FROM scans").
+	mock.ExpectQuery("SELECT job_id, scope, status, regulation, created_at, completed_at FROM scans").
 		WithArgs(jobID).
-		WillReturnRows(sqlmock.NewRows([]string{"job_id", "scope", "status", "created_at", "completed_at"}).
-			AddRow(jobID, scope, "completed", time.Now(), time.Now()))
+		WillReturnRows(sqlmock.NewRows([]string{"job_id", "scope", "status", "regulation", "created_at", "completed_at"}).
+			AddRow(jobID, scope, "completed", "CRA", time.Now(), time.Now()))
 
-	mock.ExpectQuery("SELECT resource_name, status, details FROM findings").
+	mock.ExpectQuery("SELECT resource_name, status, details, regulation FROM findings").
 		WithArgs(jobID).
-		WillReturnRows(sqlmock.NewRows([]string{"resource_name", "status", "details"}).
-			AddRow("res1", "compliant", []byte("\"all good\"")))
+		WillReturnRows(sqlmock.NewRows([]string{"resource_name", "status", "details", "regulation"}).
+			AddRow("res1", "compliant", []byte("\"all good\""), "CRA"))
 
 	res, err := s.GetScan(ctx, jobID)
 	if err != nil {

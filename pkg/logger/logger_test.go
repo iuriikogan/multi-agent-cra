@@ -13,6 +13,6 @@ func TestSetup(t *testing.T) {
 		}
 	}()
 
-	Setup("DEBUG")
+	Setup("DEBUG", "test-project")
 	slog.Info("Test log message")
 }

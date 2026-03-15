@@ -12,6 +12,7 @@ type ScanResult struct {
 	Scope       string     `json:"scope"`
 	Status      string     `json:"status"`
 	Findings    []Finding  `json:"findings"`
+	Regulation  string     `json:"regulation"`
 	CreatedAt   time.Time  `json:"created_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
@@ -21,12 +22,13 @@ type Finding struct {
 	ResourceName string `json:"resource_name"`
 	Status       string `json:"status"`
 	Details      string `json:"details"`
+	Regulation   string `json:"regulation"`
 }
 
 // Store defines persistent storage operations for compliance scan data.
 type Store interface {
 	// CreateScan initializes a new scan record.
-	CreateScan(ctx context.Context, jobID, scope string) error
+	CreateScan(ctx context.Context, jobID, scope, regulation string) error
 	// UpdateScanStatus updates the lifecycle state of a scan.
 	UpdateScanStatus(ctx context.Context, jobID, status string) error
 	// AddFinding records a single assessment result.

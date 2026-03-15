@@ -37,6 +37,7 @@ func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
 			job_id VARCHAR(255) PRIMARY KEY,
 			scope TEXT NOT NULL,
 			status VARCHAR(50) NOT NULL,
+			regulation VARCHAR(50) NOT NULL DEFAULT 'CRA',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			completed_at DATETIME
 		)
@@ -51,6 +52,7 @@ func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
 			resource_name TEXT NOT NULL,
 			status VARCHAR(50) NOT NULL,
 			details JSON NOT NULL,
+			regulation VARCHAR(50) NOT NULL DEFAULT 'CRA',
 			INDEX (job_id),
 			FOREIGN KEY (job_id) REFERENCES scans(job_id)
 		)
@@ -63,8 +65,8 @@ func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
 
 // CreateScan registers a new scan job.
 // It takes a context, jobID, and scope, returning an error if the operation fails.
-func (s *CloudSQLStore) CreateScan(ctx context.Context, jobID, scope string) error {
-	_, err := s.db.ExecContext(ctx, "INSERT IGNORE INTO scans (job_id, scope, status) VALUES (?, ?, ?)", jobID, scope, "running")
+func (s *CloudSQLStore) CreateScan(ctx context.Context, jobID, scope, regulation string) error {
+	_, err := s.db.ExecContext(ctx, "INSERT IGNORE INTO scans (job_id, scope, status, regulation) VALUES (?, ?, ?, ?)", jobID, scope, "running", regulation)
 	return err
 }
 
@@ -84,20 +86,20 @@ func (s *CloudSQLStore) UpdateScanStatus(ctx context.Context, jobID, status stri
 // It takes a context, jobID, and finding object, returning an error if the operation fails.
 func (s *CloudSQLStore) AddFinding(ctx context.Context, jobID string, f Finding) error {
 	details, _ := json.Marshal(f.Details)
-	_, err := s.db.ExecContext(ctx, "INSERT INTO findings (job_id, resource_name, status, details) VALUES (?, ?, ?, ?)", jobID, f.ResourceName, f.Status, details)
+	_, err := s.db.ExecContext(ctx, "INSERT INTO findings (job_id, resource_name, status, details, regulation) VALUES (?, ?, ?, ?, ?)", jobID, f.ResourceName, f.Status, details, f.Regulation)
 	return err
 }
 
 // GetScan retrieves scan metadata and all linked findings.
 // It takes a context and jobID, returning a ScanResult pointer and an error if the operation fails.
 func (s *CloudSQLStore) GetScan(ctx context.Context, jobID string) (*ScanResult, error) {
-	row := s.db.QueryRowContext(ctx, "SELECT job_id, scope, status, created_at, completed_at FROM scans WHERE job_id = ?", jobID)
+	row := s.db.QueryRowContext(ctx, "SELECT job_id, scope, status, regulation, created_at, completed_at FROM scans WHERE job_id = ?", jobID)
 	var res ScanResult
-	if err := row.Scan(&res.JobID, &res.Scope, &res.Status, &res.CreatedAt, &res.CompletedAt); err != nil {
+	if err := row.Scan(&res.JobID, &res.Scope, &res.Status, &res.Regulation, &res.CreatedAt, &res.CompletedAt); err != nil {
 		return nil, err
 	}
 
-	rows, err := s.db.QueryContext(ctx, "SELECT resource_name, status, details FROM findings WHERE job_id = ?", jobID)
+	rows, err := s.db.QueryContext(ctx, "SELECT resource_name, status, details, regulation FROM findings WHERE job_id = ?", jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +110,7 @@ func (s *CloudSQLStore) GetScan(ctx context.Context, jobID string) (*ScanResult,
 	for rows.Next() {
 		var f Finding
 		var detailsRaw []byte
-		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsRaw); err != nil {
+		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsRaw, &f.Regulation); err != nil {
 			return nil, err
 		}
 		f.Details = string(detailsRaw)
@@ -120,7 +122,7 @@ func (s *CloudSQLStore) GetScan(ctx context.Context, jobID string) (*ScanResult,
 // GetAllFindings retrieves all findings from the database for global reporting.
 // It takes a context and returns a slice of findings and an error if the query fails.
 func (s *CloudSQLStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT resource_name, status, details FROM findings")
+	rows, err := s.db.QueryContext(ctx, "SELECT resource_name, status, details, regulation FROM findings")
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +134,7 @@ func (s *CloudSQLStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
 	for rows.Next() {
 		var f Finding
 		var detailsRaw []byte
-		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsRaw); err != nil {
+		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsRaw, &f.Regulation); err != nil {
 			return nil, err
 		}
 		f.Details = string(detailsRaw)

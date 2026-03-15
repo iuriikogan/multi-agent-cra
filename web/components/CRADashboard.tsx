@@ -29,9 +29,8 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 
 // Finding represents a single conformity assessment result for a target PDE.
 interface Finding {
-  resource_name: string; // Full GCP resource path
-  status: string;        // Conformity state (e.g., Conformant, Non-Conformant)
   details: string;       // Detailed description of the assessment result
+  regulation: string;    // Regulation framework (CRA or DORA)
 }
 
 // CRADashboard provides the main UI for visualizing and filtering conformity findings.
@@ -42,6 +41,7 @@ export default function CRADashboard() {
   const [orgFilter, setOrgFilter] = useState('All');
   const [folderFilter, setFolderFilter] = useState('All');
   const [projectFilter, setProjectFilter] = useState('All');
+  const [regulationFilter, setRegulationFilter] = useState('All');
 
   useEffect(() => {
     // Parse URL params for initial state to support direct linking.
@@ -50,6 +50,7 @@ export default function CRADashboard() {
       if (params.has('org')) setOrgFilter(params.get('org')!);
       if (params.has('folder')) setFolderFilter(params.get('folder')!);
       if (params.has('project')) setProjectFilter(params.get('project')!);
+      if (params.has('regulation')) setRegulationFilter(params.get('regulation')!);
     }
 
     fetchFindings();
@@ -68,9 +69,12 @@ export default function CRADashboard() {
       if (projectFilter !== 'All') url.searchParams.set('project', projectFilter);
       else url.searchParams.delete('project');
 
+      if (regulationFilter !== 'All') url.searchParams.set('regulation', regulationFilter);
+      else url.searchParams.delete('regulation');
+
       window.history.replaceState({}, '', url.toString());
     }
-  }, [orgFilter, folderFilter, projectFilter]);
+  }, [orgFilter, folderFilter, projectFilter, regulationFilter]);
 
   // fetchFindings retrieves the full list of findings from the backend API.
   const fetchFindings = async () => {
@@ -118,12 +122,14 @@ export default function CRADashboard() {
   const orgs = ['All', ...Array.from(new Set(findings.map(f => extractHierarchy(f.resource_name).org).filter(o => o !== 'Unknown')))];
   const folders = ['All', ...Array.from(new Set(findings.map(f => extractHierarchy(f.resource_name).folder).filter(f => f !== 'Unknown')))];
   const projects = ['All', ...Array.from(new Set(findings.map(f => extractHierarchy(f.resource_name).proj).filter(p => p !== 'Unknown')))];
+  const regulations = ['All', 'CRA', 'DORA'];
 
   const filteredFindings = findings.filter(f => {
     const { org, folder, proj } = extractHierarchy(f.resource_name);
     if (orgFilter !== 'All' && org !== orgFilter) return false;
     if (folderFilter !== 'All' && folder !== folderFilter) return false;
     if (projectFilter !== 'All' && proj !== projectFilter) return false;
+    if (regulationFilter !== 'All' && f.regulation !== regulationFilter) return false;
     return true;
   });
 
@@ -157,16 +163,16 @@ export default function CRADashboard() {
 
   // handleExportCSV generates and initiates a CSV download of the filtered results.
   const handleExportCSV = () => {
-    const headers = ['Target PDE', 'Conformity Status', 'Assessment Details'];
+    const headers = ['Target PDE', 'Regulation', 'Conformity Status', 'Assessment Details'];
     const csvContent = [
       headers.join(','),
-      ...filteredFindings.map(f => `"${f.resource_name}","${f.status}","${f.details.replace(/"/g, '""')}"`)].join('\n');
+      ...filteredFindings.map(f => `"${f.resource_name}","${f.regulation}","${f.status}","${f.details.replace(/"/g, '""')}"`)].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `cra-findings-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `compliance-findings-export-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -235,6 +241,13 @@ export default function CRADashboard() {
                   {projects.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
                 </Select>
               </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Regulation</InputLabel>
+                <Select value={regulationFilter} label="Regulation" onChange={(e: SelectChangeEvent) => setRegulationFilter(e.target.value)}>
+                  {regulations.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+                </Select>
+              </FormControl>
             </Box>
 
             <TableContainer>
@@ -242,6 +255,7 @@ export default function CRADashboard() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Resource</TableCell>
+                    <TableCell align="center">Framework</TableCell>
                     <TableCell align="center">Status</TableCell>
                     <TableCell>Details</TableCell>
                   </TableRow>
@@ -250,6 +264,9 @@ export default function CRADashboard() {
                   {filteredFindings.map((f, i) => (
                     <TableRow key={i} hover>
                       <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{f.resource_name.split('/').pop()}</TableCell>
+                      <TableCell align="center">
+                        <Chip label={f.regulation} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
+                      </TableCell>
                       <TableCell align="center">
                         <Chip 
                           label={f.status} 
@@ -265,7 +282,7 @@ export default function CRADashboard() {
                   ))}
                   {filteredFindings.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>No findings match the selected filters.</TableCell>
+                      <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>No findings match the selected filters.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>

@@ -23,8 +23,8 @@ type mockStore struct {
 	db *sql.DB
 }
 
-func (m *mockStore) CreateScan(ctx context.Context, jobID, scope string) error {
-	_, err := m.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status) VALUES ($1, $2, $3)", jobID, scope, "running")
+func (m *mockStore) CreateScan(ctx context.Context, jobID, scope, regulation string) error {
+	_, err := m.db.ExecContext(ctx, "INSERT INTO scans (job_id, scope, status, regulation) VALUES ($1, $2, $3, $4)", jobID, scope, "running", regulation)
 	return err
 }
 
@@ -40,17 +40,17 @@ func (m *mockStore) UpdateScanStatus(ctx context.Context, jobID, status string) 
 
 func (m *mockStore) AddFinding(ctx context.Context, jobID string, f store.Finding) error {
 	details, _ := json.Marshal(f.Details)
-	_, err := m.db.ExecContext(ctx, "INSERT INTO findings (job_id, resource_name, status, details) VALUES ($1, $2, $3, $4)", jobID, f.ResourceName, f.Status, details)
+	_, err := m.db.ExecContext(ctx, "INSERT INTO findings (job_id, resource_name, status, details, regulation) VALUES ($1, $2, $3, $4, $5)", jobID, f.ResourceName, f.Status, details, f.Regulation)
 	return err
 }
 
 func (m *mockStore) GetScan(ctx context.Context, jobID string) (*store.ScanResult, error) {
-	row := m.db.QueryRowContext(ctx, "SELECT job_id, scope, status, created_at, completed_at FROM scans WHERE job_id = $1", jobID)
+	row := m.db.QueryRowContext(ctx, "SELECT job_id, scope, status, regulation, created_at, completed_at FROM scans WHERE job_id = $1", jobID)
 	var res store.ScanResult
-	if err := row.Scan(&res.JobID, &res.Scope, &res.Status, &res.CreatedAt, &res.CompletedAt); err != nil {
+	if err := row.Scan(&res.JobID, &res.Scope, &res.Status, &res.Regulation, &res.CreatedAt, &res.CompletedAt); err != nil {
 		return nil, err
 	}
-	rows, err := m.db.QueryContext(ctx, "SELECT resource_name, status, details FROM findings WHERE job_id = $1", jobID)
+	rows, err := m.db.QueryContext(ctx, "SELECT resource_name, status, details, regulation FROM findings WHERE job_id = $1", jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (m *mockStore) GetScan(ctx context.Context, jobID string) (*store.ScanResul
 	for rows.Next() {
 		var f store.Finding
 		var detailsStr string
-		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsStr); err != nil {
+		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsStr, &f.Regulation); err != nil {
 			return nil, err
 		}
 		f.Details = detailsStr
@@ -71,7 +71,7 @@ func (m *mockStore) GetScan(ctx context.Context, jobID string) (*store.ScanResul
 }
 
 func (m *mockStore) GetAllFindings(ctx context.Context) ([]store.Finding, error) {
-	rows, err := m.db.QueryContext(ctx, "SELECT resource_name, status, details FROM findings")
+	rows, err := m.db.QueryContext(ctx, "SELECT resource_name, status, details, regulation FROM findings")
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (m *mockStore) GetAllFindings(ctx context.Context) ([]store.Finding, error)
 	for rows.Next() {
 		var f store.Finding
 		var detailsStr string
-		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsStr); err != nil {
+		if err := rows.Scan(&f.ResourceName, &f.Status, &detailsStr, &f.Regulation); err != nil {
 			return nil, err
 		}
 		f.Details = detailsStr
@@ -160,7 +160,7 @@ func TestPostScanEndpoint(t *testing.T) {
 	handler, mock, _, db := setupTestEnv(t)
 
 	mock.ExpectExec("INSERT INTO scans").
-		WithArgs(sqlmock.AnyArg(), "projects/test-project", "running").
+		WithArgs(sqlmock.AnyArg(), "projects/test-project", "running", "CRA").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	mock.ExpectClose()
@@ -193,15 +193,15 @@ func TestPostScanEndpoint(t *testing.T) {
 func TestGetScanEndpoint(t *testing.T) {
 	handler, mock, _, db := setupTestEnv(t)
 
-	mock.ExpectQuery("SELECT job_id, scope, status, created_at, completed_at FROM scans WHERE job_id = \\$1").
+	mock.ExpectQuery("SELECT job_id, scope, status, regulation, created_at, completed_at FROM scans WHERE job_id = \\$1").
 		WithArgs("test-job-id").
-		WillReturnRows(sqlmock.NewRows([]string{"job_id", "scope", "status", "created_at", "completed_at"}).
-			AddRow("test-job-id", "projects/test-project", "running", time.Now(), nil))
+		WillReturnRows(sqlmock.NewRows([]string{"job_id", "scope", "status", "regulation", "created_at", "completed_at"}).
+			AddRow("test-job-id", "projects/test-project", "running", "CRA", time.Now(), nil))
 
-	mock.ExpectQuery(`SELECT resource_name, status, details FROM findings WHERE job_id = \$1`).
+	mock.ExpectQuery(`SELECT resource_name, status, details, regulation FROM findings WHERE job_id = \$1`).
 		WithArgs("test-job-id").
-		WillReturnRows(sqlmock.NewRows([]string{"resource_name", "status", "details"}).
-			AddRow("res1", "compliant", `{"some":"detail"}`))
+		WillReturnRows(sqlmock.NewRows([]string{"resource_name", "status", "details", "regulation"}).
+			AddRow("res1", "compliant", `{"some":"detail"}`, "CRA"))
 
 	mock.ExpectClose()
 
@@ -228,10 +228,10 @@ func TestGetScanEndpoint(t *testing.T) {
 func TestFindingsEndpoint(t *testing.T) {
 	handler, mock, _, db := setupTestEnv(t)
 
-	mock.ExpectQuery("SELECT resource_name, status, details FROM findings").
-		WillReturnRows(sqlmock.NewRows([]string{"resource_name", "status", "details"}).
-			AddRow("res1", "compliant", `{"detail":"1"}`).
-			AddRow("res2", "non-compliant", `{"detail":"2"}`))
+	mock.ExpectQuery("SELECT resource_name, status, details, regulation FROM findings").
+		WillReturnRows(sqlmock.NewRows([]string{"resource_name", "status", "details", "regulation"}).
+			AddRow("res1", "compliant", `{"detail":"1"}`, "CRA").
+			AddRow("res2", "non-compliant", `{"detail":"2"}`, "CRA"))
 
 	mock.ExpectClose()
 

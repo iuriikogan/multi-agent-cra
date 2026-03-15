@@ -57,12 +57,16 @@ func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[str
 		if query == "" {
 			return "Error: query argument is required.", nil
 		}
-		chunks, err := knowledge.Search(ctx, e.Client, query, 3)
+		reg := knowledge.RegulationCRA
+		if r, ok := args["regulation"].(string); ok && r == string(knowledge.RegulationDORA) {
+			reg = knowledge.RegulationDORA
+		}
+		chunks, err := knowledge.Search(ctx, e.Client, query, reg, 3)
 		if err != nil {
 			return fmt.Sprintf("Error searching knowledge base: %v", err), nil
 		}
 		var sb strings.Builder
-		sb.WriteString("Relevant CRA Information:\n")
+		sb.WriteString(fmt.Sprintf("Relevant %s Information:\n", reg))
 		for _, c := range chunks {
 			fmt.Fprintf(&sb, "- %s (Relevance: %.2f)\n", c.Text, c.Score)
 		}

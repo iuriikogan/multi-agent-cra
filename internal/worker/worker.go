@@ -111,8 +111,9 @@ The output should be a JSON object with the following fields: 'resource_name', '
 		}
 
 		var job struct {
-			JobID string `json:"job_id"`
-			Scope string `json:"scope"`
+			JobID      string `json:"job_id"`
+			Scope      string `json:"scope"`
+			Regulation string `json:"regulation"`
 		}
 		if err := json.Unmarshal(req.Message.Data, &job); err != nil {
 			slog.Error("Failed to parse job from push", "error", err)
@@ -123,14 +124,14 @@ The output should be a JSON object with the following fields: 'resource_name', '
 		slog.Info("Processing scan request", "job_id", job.JobID)
 
 		if db != nil {
-			if err := db.CreateScan(r.Context(), job.JobID, job.Scope); err != nil {
+			if err := db.CreateScan(r.Context(), job.JobID, job.Scope, job.Regulation); err != nil {
 				slog.Error("Failed to create scan record", "error", err)
 				http.Error(w, "db error", http.StatusInternalServerError)
 				return
 			}
 		}
 
-		err := runScan(r.Context(), cfg, pubsubClient, aggregatorAgent, job.Scope, job.JobID, db)
+		err := runScan(r.Context(), cfg, pubsubClient, aggregatorAgent, job.Scope, job.JobID, job.Regulation, db)
 
 		status := "completed"
 		if err != nil {
@@ -156,7 +157,7 @@ The output should be a JSON object with the following fields: 'resource_name', '
 }
 
 // runScan executes resource discovery and delegates assessment tasks to agents.
-func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, aggregator agent.Agent, scope, jobID string, db store.Store) error {
+func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, aggregator agent.Agent, scope, jobID, regulation string, db store.Store) error {
 	discoveryCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
@@ -206,8 +207,9 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 	batchSize := 10
 	for i, a := range assets {
 		task := workflow.AgentTask{
-			JobID: jobID,
-			Scope: scope,
+			JobID:      jobID,
+			Scope:      scope,
+			Regulation: regulation,
 			Resource: core.GCPResource{
 				ID: fmt.Sprintf("r%d", i), Name: a.Name, Type: a.AssetType, Region: a.Location, ProjectID: scope,
 			},

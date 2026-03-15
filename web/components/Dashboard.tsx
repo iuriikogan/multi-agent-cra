@@ -40,6 +40,7 @@ interface MonitoringEvent {
 
 export default function Dashboard() {
   const [scope, setScope] = useState('projects/crc-demos-489818');
+  const [regulation, setRegulation] = useState('CRA');
   const [jobId, setJobId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,7 +123,7 @@ export default function Dashboard() {
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope }),
+        body: JSON.stringify({ scope, regulation }),
       });
       if (!res.ok) throw new Error('Failed to start scan');
       const data = await res.json();
@@ -167,6 +168,21 @@ export default function Dashboard() {
                 disabled={loading}
                 size="small"
               />
+            </Box>
+            <Box sx={{ minWidth: 120 }}>
+              <TextField
+                select
+                label="Regulation"
+                value={regulation}
+                onChange={(e) => setRegulation(e.target.value)}
+                disabled={loading}
+                size="small"
+                fullWidth
+                SelectProps={{ native: true }}
+              >
+                <option value="CRA">CRA</option>
+                <option value="DORA">DORA</option>
+              </TextField>
             </Box>
             <Button
               variant="contained" 

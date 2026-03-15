@@ -20,7 +20,7 @@ func TestSQLiteStore(t *testing.T) {
 	jobID := "test-job"
 	scope := "projects/test"
 
-	if err := s.CreateScan(ctx, jobID, scope); err != nil {
+	if err := s.CreateScan(ctx, jobID, scope, "CRA"); err != nil {
 		t.Fatalf("failed to create scan: %v", err)
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/pkg/config"
 	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Hub manages a set of active SSE client channels and broadcasts messages to them.
@@ -154,7 +155,7 @@ func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.
 		})
 	}
 
-	return corsMiddleware(apiMux)
+	return otelhttp.NewHandler(corsMiddleware(apiMux), "api-server")
 }
 
 // Start launches the HTTP server and manages its lifecycle.
@@ -192,7 +193,8 @@ func Start(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client, 
 // handleScanCreate processes requests to initiate a new compliance scan.
 func handleScanCreate(w http.ResponseWriter, r *http.Request, pubsubClient *queue.Client, cfg *config.Config, db store.Store) {
 	var req struct {
-		Scope string `json:"scope"`
+		Scope      string `json:"scope"`
+		Regulation string `json:"regulation"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -200,9 +202,17 @@ func handleScanCreate(w http.ResponseWriter, r *http.Request, pubsubClient *queu
 	}
 
 	jobID := uuid.New().String()
-	msg, _ := json.Marshal(map[string]string{"job_id": jobID, "scope": req.Scope})
+	reg := req.Regulation
+	if reg == "" {
+		reg = "CRA" // Default
+	}
+	msg, _ := json.Marshal(map[string]string{
+		"job_id":     jobID,
+		"scope":      req.Scope,
+		"regulation": reg,
+	})
 
-	if err := db.CreateScan(r.Context(), jobID, req.Scope); err != nil {
+	if err := db.CreateScan(r.Context(), jobID, req.Scope, reg); err != nil {
 		slog.Error("Failed to create scan record", "error", err)
 		http.Error(w, "Failed to initialize scan", http.StatusInternalServerError)
 		return

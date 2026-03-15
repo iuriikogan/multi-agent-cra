@@ -67,9 +67,47 @@ graph TD
     WorkerFleet -->|Embedded Context| KB[(CRA Knowledge Base: Vector Graph)]
     WorkerFleet <-->|Discover/Tag| GCP_API[GCP Asset Inventory API]
 
+    %% Observability
+    Server -.->|Export Spans| Trace[Cloud Trace]
+    WorkerFleet -.->|Export Spans| Trace
+    Server -.->|Structured Logs| Logging[Cloud Logging]
+    WorkerFleet -.->|Structured Logs| Logging
+
     classDef gcp fill:#e8f0fe,stroke:#1a73e8,stroke-width:2px;
-    class Server,WorkerFleet,CloudArmor,PubSub_Scan,PubSub_Internal,PubSub_Monitoring,DB,Gemini,GCP_API,KB gcp;
+    class Server,WorkerFleet,CloudArmor,PubSub_Scan,PubSub_Internal,PubSub_Monitoring,DB,Gemini,GCP_API,KB,Trace,Logging gcp;
 ```
+
+## Observability & Distributed Tracing
+
+The system implements full-stack observability using OpenTelemetry to provide end-to-end visibility into the asynchronous, multi-agent workflows.
+
+### Distributed Tracing Flow
+
+Trace context is propagated across service boundaries (including Pub/Sub) to maintain a single trace for each compliance assessment.
+
+```mermaid
+sequenceDiagram
+    participant Browser as Next.js Frontend
+    participant Server as Go API Server
+    participant PubSub as Google Cloud Pub/Sub
+    participant Worker as Go Worker (Agents)
+    participant Trace as Google Cloud Trace
+
+    Browser->>Server: POST /api/scan (Start Span)
+    Server->>Server: Create Scan Record
+    Server->>PubSub: Publish Scan Request (Inject Context)
+    Server-->>Browser: 202 Accepted
+    Server->>Trace: Export Server Span
+
+    PubSub-->>Worker: Pull Message (Extract Context)
+    Worker->>Worker: Start Processing Span
+    Worker->>Worker: Agent Reasoning (Gemini)
+    Worker->>Trace: Export Worker Spans
+```
+
+### Log-Trace Correlation
+
+By injecting `logging.googleapis.com/trace` and `logging.googleapis.com/spanId` into structured JSON logs, the system enables seamless navigation between logs and traces in the Google Cloud Console. This is critical for debugging the asynchronous behavior of the multi-agent pipeline.
 
 ## Agent Pipeline & Data Flow
 

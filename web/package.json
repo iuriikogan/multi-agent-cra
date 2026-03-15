@@ -11,21 +11,25 @@
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
+    "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0",
     "@mui/icons-material": "^5.14.0",
     "@mui/material": "^5.14.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.71.0",
+    "@opentelemetry/sdk-node": "^0.213.0",
     "chart.js": "^4.3.0",
-    "next": "^16.1.5",
+    "next": "^16.1.6",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@types/node": "20.4.5",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "eslint": "8.45.0",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^15.0.0",
-    "typescript": "5.1.6"
+    "typescript": "^5.9.3"
   },
   "overrides": {
     "zod": "^3.22.3",

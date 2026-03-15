@@ -17,6 +17,7 @@ import (
 	"github.com/iuriikogan/multi-agent-cra/internal/worker"
 	"github.com/iuriikogan/multi-agent-cra/pkg/config"
 	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
+	"github.com/iuriikogan/multi-agent-cra/pkg/observability"
 	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
 	"github.com/iuriikogan/multi-agent-cra/pkg/store"
 )
@@ -32,10 +33,15 @@ func main() {
 	flag.StringVar(&cfg.Models.Tagger, "model-tagger", cfg.Models.Tagger, "Model for ResourceTagger agent")
 	flag.Parse()
 
-	logger.Setup(cfg.LogLevel)
+	logger.Setup(cfg.LogLevel, cfg.ProjectID)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if err := observability.InitTrace(ctx, cfg.ProjectID); err != nil {
+		slog.Error("Failed to initialize tracing", "error", err)
+	}
+	defer observability.Shutdown(context.Background())
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -11,6 +11,7 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   Real-time Dashboard: A Next.js frontend embedded in the Go binary featuring live Server-Sent Events (SSE) log streaming and interactive compliance charts.
 *   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
 *   Flexible Storage: Choose between robust Cloud SQL (PostgreSQL) for production or lightweight in-memory SQLite for zero-dependency local development.
+*   Full-stack Observability: Integrated OpenTelemetry tracing and structured logging with Google Cloud Trace and Cloud Logging correlation.
   
 ## System Architecture and Data Flow
 
@@ -62,7 +63,7 @@ Before deploying the application locally or in production, ensure the following 
 *   Go 1.25 or higher installed.
 *   Terraform installed.
 *   A valid Gemini API Key.
-*   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com, sqladmin.googleapis.com.
+*   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com, sqladmin.googleapis.com, cloudtrace.googleapis.com.
 
 ## Steps
 

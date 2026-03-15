@@ -10,8 +10,11 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Init() failed: %v", err)
 	}
-	if len(knowledgeBase) == 0 {
-		t.Error("knowledgeBase is empty after Init()")
+	if len(knowledgeBases[RegulationCRA]) == 0 {
+		t.Error("knowledgeBases[RegulationCRA] is empty after Init()")
+	}
+	if len(knowledgeBases[RegulationDORA]) == 0 {
+		t.Error("knowledgeBases[RegulationDORA] is empty after Init()")
 	}
 }
 
