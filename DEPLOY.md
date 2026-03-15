@@ -3,8 +3,8 @@
 This document provides detailed instructions for deploying the Multi-Agent Regulatory Compliance System to Google Cloud Run using the unified `build.sh` script.
 
 The system deploys as two simplified Cloud Run services:
-1.  cra-server: Houses the API and the React Frontend (static export).
-2.  cra-worker: Handles the background AI agent tasks.
+1.  compliance-server: Houses the API and the React Frontend (static export).
+2.  compliance-worker: Handles the background AI agent tasks.
 
 ## Prerequisites
 
@@ -68,7 +68,7 @@ Use this option if you prefer managing the lifecycle of your infrastructure and 
 1.  **Build and Push Images**:
     If not already in the registry, build and push your images:
     ```bash
-    gcloud builds submit --config=cloudbuild.yaml --substitutions=_REGION="europe-west1",_REPO_NAME="multi-agent-cra"
+    gcloud builds submit --config=cloudbuild.yaml --substitutions=_REGION="europe-west1",_REPO_NAME="multi-agent-compliance"
     ```
 
 2.  **Deploy via Terraform**:
@@ -81,8 +81,8 @@ Use this option if you prefer managing the lifecycle of your infrastructure and 
       -var="project_id=your-project-id" \
       -var="region=europe-west1" \
       -var="gemini_api_key=your-key" \
-      -var="server_image=europe-west1-docker.pkg.dev/your-project-id/multi-agent-cra/server:latest" \
-      -var="worker_image=europe-west1-docker.pkg.dev/your-project-id/multi-agent-cra/worker:latest"
+      -var="server_image=europe-west1-docker.pkg.dev/your-project-id/multi-agent-compliance/server:latest" \
+      -var="worker_image=europe-west1-docker.pkg.dev/your-project-id/multi-agent-compliance/worker:latest"
     ```
 
     > [!IMPORTANT]
@@ -107,7 +107,7 @@ authorized_users = [
 **Option A: Local Proxy (Recommended)**
 Use the Google Cloud SDK to create a local proxy that handles authentication for you:
 ```bash
-gcloud run services proxy cra-server --region europe-west1
+gcloud run services proxy compliance-server --region europe-west1
 ```
 Then navigate to `http://localhost:8080` in your browser.
 
@@ -115,7 +115,7 @@ Then navigate to `http://localhost:8080` in your browser.
 To access via the direct Cloud Run URL, you must include an OIDC ID Token:
 ```bash
 # Get the service URL
-SERVICE_URL=$(gcloud run services describe cra-server --format='value(status.url)')
+SERVICE_URL=$(gcloud run services describe compliance-server --format='value(status.url)')
 
 # Access with ID Token
 curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" $SERVICE_URL
@@ -128,7 +128,7 @@ curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" $SERVICE_URL
     *   Go to Console: Navigate to Network Security > Cloud Armor.
     *   Create Policy: Create a policy named `agent-armor-policy`.
     *   Configure Rules: Enable Model Armor to filter malicious LLM prompts. Enable Adaptive Protection for DDoS mitigation. Restrict access to your corporate IP range or VPN if required.
-    *   Attach Policy: Go to Cloud Run > cra-server > Integrations (or Security). Attach the Cloud Armor policy/load balancer configuration.
+    *   Attach Policy: Go to Cloud Run > compliance-server > Integrations (or Security). Attach the Cloud Armor policy/load balancer configuration.
 
 ## Verification
 
@@ -136,7 +136,8 @@ To verify the deployment:
 
 1.  Local: Access the dashboard at `http://localhost:8080`.
 2.  Production: Follow the steps in the [Dashboard Authentication & Access](#dashboard-authentication--access) section to securely connect to the `cra-server` URL. Using `gcloud run services proxy` is the recommended method for browser access.
-3.  Check Cloud Run logs to ensure both `cra-server` and `cra-worker` are running without initialization errors.
+2.  Production: Follow the steps in the [Dashboard Authentication & Access](#dashboard-authentication--access) section to securely connect to the `compliance-server` URL. Using `gcloud run services proxy` is the recommended method for browser access.
+3.  Check Cloud Run logs to ensure both `compliance-server` and `compliance-worker` are running without initialization errors.
 
 ## Rollback
 
@@ -157,5 +158,5 @@ To tear down the deployed resources:
 
 *   Frontend: Built as a static site (`next build` with `output: export`) and embedded into the Go binary (`//go:embed`). This allows a single container to serve the UI and API.
 *   Scaling:
-    *   `cra-server`: Auto-scales based on HTTP traffic.
-    *   `cra-worker`: Auto-scales based on CPU/Memory usage (or custom Pub/Sub metrics if configured). Can scale to 0 to save costs.
+    *   `compliance-server`: Auto-scales based on HTTP traffic.
+    *   `compliance-worker`: Auto-scales based on CPU/Memory usage (or custom Pub/Sub metrics if configured). Can scale to 0 to save costs.

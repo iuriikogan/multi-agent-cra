@@ -18,7 +18,7 @@ steps:
     args:
       - '-c'
       - |
-        gsutil cp gs://${PROJECT_ID}-build-cache/multi-agent-cra/web-node-modules.tar.gz . || echo "No cache found"
+        gsutil cp gs://${PROJECT_ID}-build-cache/multi-agent-compliance/web-node-modules.tar.gz . || echo "No cache found"
         if [ -f web-node-modules.tar.gz ]; then tar -xzf web-node-modules.tar.gz; fi
     waitFor: ['Prepare Cache']
 
@@ -45,7 +45,7 @@ steps:
       - '-c'
       - |
         tar -czf web-node-modules.tar.gz web/node_modules
-        gsutil cp web-node-modules.tar.gz gs://${PROJECT_ID}-build-cache/multi-agent-cra/web-node-modules.tar.gz
+        gsutil cp web-node-modules.tar.gz gs://${PROJECT_ID}-build-cache/multi-agent-compliance/web-node-modules.tar.gz
     waitFor: ['Install Frontend']
 
   # --- DOCKER BUILDS (Using Kaniko for optimized caching) ---
@@ -77,7 +77,7 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'cra-server'
+      - 'compliance-server'
       - '--image'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
       - '--region'
@@ -85,13 +85,13 @@ steps:
       - '--ingress'
       - 'all'
       - '--service-account'
-      - 'cra-server-sa@${PROJECT_ID}.iam.gserviceaccount.com'
+      - 'compliance-server-sa@${PROJECT_ID}.iam.gserviceaccount.com'
       - '--vpc-connector'
-      - 'cra-connector'
+      - 'compliance-connector'
       - '--set-env-vars'
       - 'PROJECT_ID=${PROJECT_ID},ROLE=server,DATABASE_TYPE=CLOUD_SQL'
       - '--set-env-vars'
-      - 'DATABASE_URL=cra_user:change_me_in_production@tcp(${_DB_IP}:3306)/cra_db?parseTime=true'
+      - 'DATABASE_URL=compliance_user:change_me_in_production@tcp(${_DB_IP}:3306)/compliance_db?parseTime=true'
       - '--set-env-vars'
       - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
       - '--set-secrets'
@@ -105,7 +105,7 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'cra-worker'
+      - 'compliance-worker'
       - '--image'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
       - '--region'
@@ -113,13 +113,13 @@ steps:
       - '--ingress'
       - 'internal'
       - '--service-account'
-      - 'cra-worker-sa@${PROJECT_ID}.iam.gserviceaccount.com'
+      - 'compliance-worker-sa@${PROJECT_ID}.iam.gserviceaccount.com'
       - '--vpc-connector'
-      - 'cra-connector'
+      - 'compliance-connector'
       - '--set-env-vars'
       - 'PROJECT_ID=${PROJECT_ID},ROLE=worker,DATABASE_TYPE=CLOUD_SQL'
       - '--set-env-vars'
-      - 'DATABASE_URL=cra_user:change_me_in_production@tcp(${_DB_IP}:3306)/cra_db?parseTime=true'
+      - 'DATABASE_URL=compliance_user:change_me_in_production@tcp(${_DB_IP}:3306)/compliance_db?parseTime=true'
       - '--set-env-vars'
       - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
       - '--set-secrets'
@@ -128,7 +128,7 @@ steps:
 
 substitutions:
   _REGION: europe-west1
-  _REPO_NAME: multi-agent-cra
+  _REPO_NAME: multi-agent-compliance
   _TAG: latest
   _DB_IP: 10.0.0.3
 

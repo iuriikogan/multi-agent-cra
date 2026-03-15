@@ -1,4 +1,4 @@
-# Package pubsub configures messaging infrastructure for the multi-agent orchestration.
+# Package pubsub configures messaging infrastructure for the multi-framework regulatory orchestration.
 
 resource "google_pubsub_topic" "scan_requests" {
   name = "scan-requests" # Inbound scan triggers from the frontend

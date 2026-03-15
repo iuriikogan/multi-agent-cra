@@ -1,4 +1,4 @@
-# Package cloud_run defines the serverless compute resources for the compliance system.
+# Package cloud_run defines the serverless compute resources for the regulatory compliance system.
 
 resource "google_cloud_run_v2_service" "server" {
   custom_audiences = ["google-cloud-run"]
@@ -33,7 +33,7 @@ resource "google_cloud_run_v2_service" "server" {
       }
       env {
         name  = "DATABASE_URL"
-        value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
+        value = "compliance_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/compliance_db?parseTime=true"
       }
       env {
         name  = "PUBSUB_TOPIC_SCAN_REQUESTS"
@@ -97,7 +97,7 @@ resource "google_cloud_run_v2_service" "worker" {
       }
       env {
         name  = "DATABASE_URL"
-        value = "cra_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/cra_db?parseTime=true"
+        value = "compliance_user:${var.db_password}@tcp(${google_sql_database_instance.instance.private_ip_address}:3306)/compliance_db?parseTime=true"
       }
       env {
         name  = "PUBSUB_TOPIC_SCAN_REQUESTS"

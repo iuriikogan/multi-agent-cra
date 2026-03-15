@@ -12,7 +12,8 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
   
 ## High-Level System Architecture and Data Flow
-#####    (Detailed Architecture can be found in ARCHITECTURE.md)
+
+##### Detailed Architecture can be found in [ARCHITECTURE.md](https://github.com/iuriikogan/multi-agent-cra/blob/main/ARCHITECTURE.md)
 
 The system uses a strictly decoupled producer-consumer model:
 

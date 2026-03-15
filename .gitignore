@@ -66,3 +66,11 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local AI
+.gemini/
+GEMINI.md
+.claude/
+CLAUDE.md
+.cursor/
+.cursorrules

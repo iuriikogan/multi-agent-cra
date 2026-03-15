@@ -1,4 +1,4 @@
-# Package variables defines input parameters for the compliance system infrastructure.
+# Package variables defines input parameters for the multi-regulation compliance system infrastructure.
 
 variable "project_id" {
   description = "The target GCP project ID."
@@ -36,17 +36,17 @@ variable "worker_image" {
 variable "repo_name" {
   description = "Name of the Artifact Registry repository."
   type        = string
-  default     = "multi-agent-cra"
+  default     = "multi-agent-compliance"
 }
 
 variable "cloud_run_server_name" {
   description = "Service name for the Cloud Run frontend."
   type        = string
-  default     = "cra-server"
+  default     = "compliance-server"
 }
 
 variable "cloud_run_worker_name" {
   description = "Service name for the Cloud Run backend worker."
   type        = string
-  default     = "cra-worker"
+  default     = "compliance-worker"
 }

@@ -1,12 +1,12 @@
 # Package vpc defines the network topology and serverless connectivity for the system.
 
 resource "google_compute_network" "vpc" {
-  name                    = "cra-vpc"
+  name                    = "compliance-vpc"
   auto_create_subnetworks = false # Custom subnetting for better control
 }
 
 resource "google_compute_subnetwork" "default" {
-  name          = "cra-subnet"
+  name          = "compliance-subnet"
   ip_cidr_range = "10.0.0.0/24"
   network       = google_compute_network.vpc.id
   region        = var.region
@@ -19,7 +19,7 @@ resource "google_compute_subnetwork" "default" {
 }
 
 resource "google_vpc_access_connector" "connector" {
-  name          = "cra-connector"
+  name          = "compliance-connector"
   region        = var.region
   ip_cidr_range = "10.8.0.0/28" # Small range is sufficient for serverless egress
   network       = google_compute_network.vpc.id

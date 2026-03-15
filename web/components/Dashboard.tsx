@@ -19,6 +19,7 @@ interface Finding {
   resource_name: string;
   status: string;
   details: string;
+  regulation: string; // Added field
 }
 
 interface ScanResult {
@@ -270,6 +271,7 @@ export default function Dashboard() {
                       <TableHead>
                         <TableRow>
                           <TableCell>Resource</TableCell>
+                          <TableCell align="center">Framework</TableCell>
                           <TableCell align="center">Status</TableCell>
                           <TableCell>Details</TableCell>
                         </TableRow>
@@ -279,6 +281,9 @@ export default function Dashboard() {
                           <TableRow key={idx} hover>
                             <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
                               {f.resource_name.split('/').pop()}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip label={f.regulation} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
                             </TableCell>
                             <TableCell align="center">
                               <Chip
@@ -293,7 +298,7 @@ export default function Dashboard() {
                           </TableRow>
                         )) : (
                           <TableRow>
-                            <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                              <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                               {loading ? 'Analyzing resources...' : 'No telemetry data received.'}
                             </TableCell>
                           </TableRow>

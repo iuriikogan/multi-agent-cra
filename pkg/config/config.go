@@ -64,7 +64,7 @@ func Load() *Config {
 		Region:        os.Getenv("REGION"),
 		LogLevel:      getEnv("LOG_LEVEL", "INFO"),
 		APIKey:        os.Getenv("GEMINI_API_KEY"),
-		GCSBucketName: getEnv("GCS_BUCKET_NAME", "cra-data-"+projectID),
+		GCSBucketName: getEnv("GCS_BUCKET_NAME", "compliance-data-"+projectID),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		DatabaseType:  os.Getenv("DATABASE_TYPE"),
 		StoreType:     getEnv("STORE_TYPE", "gcs"),

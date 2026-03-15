@@ -126,8 +126,8 @@ sequenceDiagram
 1.  **Secure Configuration Management:** No secrets (API keys, DB credentials) are stored in code or configuration files. They are injected exclusively via environment variables at runtime, sourced from Google Secret Manager.
 2.  **Least Privilege Execution (Identity-Based Security):**
     *   The system uses dedicated Google Service Accounts (defined in `iam.tf`) for different stages:
-        *   `cra-server-sa`: Used by the API/UI server with access to Cloud SQL and Secrets.
-        *   `cra-worker-sa`: Used by the background worker with access to Vertex AI, Cloud Asset API, Cloud SQL, and Secrets.
+        *   `compliance-server-sa`: Used by the API/UI server with access to Cloud SQL and Secrets.
+        *   `compliance-worker-sa`: Used by the background worker with access to Vertex AI, Cloud Asset API, Cloud SQL, and Secrets.
         *   Agent-Specific Accounts (`sa-classifier`, `sa-auditor`, `sa-vuln`, `sa-reporter`): Available for fine-grained execution where individual agents run in isolated contexts.
     *   **Pub/Sub Push Authentication**: All internal agent communication uses Pub/Sub **Push Subscriptions** with OIDC token authentication. The worker services validate these tokens, ensuring that only the authorized Pub/Sub service can trigger agent logic.
 3.  **Network Isolation:** 

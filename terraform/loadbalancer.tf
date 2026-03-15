@@ -1,11 +1,11 @@
 # loadbalancer.tf - Global External Application Load Balancer with Cloud Armor
 
 resource "google_compute_global_address" "default" {
-  name = "cra-dashboard-ip"
+  name = "compliance-dashboard-ip"
 }
 
 resource "google_compute_region_network_endpoint_group" "serverless_neg" {
-  name                  = "cra-server-neg"
+  name                  = "compliance-server-neg"
   network_endpoint_type = "SERVERLESS"
   region                = var.region
   cloud_run {
@@ -14,7 +14,7 @@ resource "google_compute_region_network_endpoint_group" "serverless_neg" {
 }
 
 resource "google_compute_backend_service" "default" {
-  name                  = "cra-backend"
+  name                  = "compliance-backend"
   protocol              = "HTTPS"
   port_name             = "http"
   load_balancing_scheme = "EXTERNAL_MANAGED"
@@ -26,17 +26,17 @@ resource "google_compute_backend_service" "default" {
 }
 
 resource "google_compute_url_map" "default" {
-  name            = "cra-url-map"
+  name            = "compliance-url-map"
   default_service = google_compute_backend_service.default.id
 }
 
 resource "google_compute_target_http_proxy" "default" {
-  name    = "cra-http-proxy"
+  name    = "compliance-http-proxy"
   url_map = google_compute_url_map.default.id
 }
 
 resource "google_compute_global_forwarding_rule" "default" {
-  name                  = "cra-frontend-rule"
+  name                  = "compliance-frontend-rule"
   target                = google_compute_target_http_proxy.default.id
   port_range            = "80"
   ip_address            = google_compute_global_address.default.address
@@ -44,8 +44,8 @@ resource "google_compute_global_forwarding_rule" "default" {
 }
 
 resource "google_compute_security_policy" "policy" {
-  name        = "cra-security-policy"
-  description = "Basic security policy for CRA Dashboard"
+  name        = "compliance-security-policy"
+  description = "Basic security policy for Compliance Dashboard"
 
   rule {
     action   = "deny(403)"

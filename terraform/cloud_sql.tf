@@ -1,7 +1,7 @@
-# Package cloud_sql configures the managed database instance for findings storage.
+# Package cloud_sql configures the managed database instance for multi-framework compliance findings.
 
 resource "google_sql_database_instance" "instance" {
-  name             = "cra-mysql-instance"
+  name             = "compliance-mysql-instance"
   region           = var.region
   database_version = "MYSQL_8_0"
 
@@ -35,12 +35,12 @@ resource "google_sql_database_instance" "instance" {
 }
 
 resource "google_sql_database" "database" {
-  name     = "cra_db"
+  name     = "compliance_db"
   instance = google_sql_database_instance.instance.name
 }
 
 resource "google_sql_user" "users" {
-  name     = "cra_user"
+  name     = "compliance_user"
   instance = google_sql_database_instance.instance.name
   host     = "%" # Allow connections from any IP within the private VPC range
   password = var.db_password

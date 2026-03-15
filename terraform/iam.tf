@@ -1,11 +1,11 @@
-# Package iam manages service accounts and permission bindings for the compliance agents.
+# Package iam manages service accounts and permission bindings for the regulatory compliance agents.
 
 # ------------------------------------------------------------------------------
 # 1. Server Service Account
 # ------------------------------------------------------------------------------
 resource "google_service_account" "server_sa" {
-  account_id   = "cra-server-sa"
-  display_name = "Identity for the compliance dashboard server"
+  account_id   = "compliance-server-sa"
+  display_name = "Identity for the compliance platform server"
 }
 
 resource "google_project_iam_member" "server_secret_accessor" {
@@ -24,8 +24,8 @@ resource "google_project_iam_member" "server_sql_client" {
 # 2. Worker Service Account
 # ------------------------------------------------------------------------------
 resource "google_service_account" "worker_sa" {
-  account_id   = "cra-worker-sa"
-  display_name = "Identity for the compliance background worker"
+  account_id   = "compliance-worker-sa"
+  display_name = "Identity for the compliance platform worker"
 }
 
 resource "google_project_iam_member" "worker_secret_accessor" {
@@ -53,7 +53,51 @@ resource "google_project_iam_member" "worker_asset_viewer" {
 }
 
 # ------------------------------------------------------------------------------
-# 3. Agent-Specific Service Accounts (Legacy/Specific Agents)
+# 3. Cloud Build Service Account (Insecure Default Replacement)
+# ------------------------------------------------------------------------------
+resource "google_service_account" "build_sa" {
+  account_id   = "compliance-build-sa"
+  display_name = "Identity for the compliance platform build pipeline"
+}
+
+resource "google_project_iam_member" "build_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+resource "google_project_iam_member" "build_artifact_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+resource "google_project_iam_member" "build_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+resource "google_project_iam_member" "build_iam_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+resource "google_project_iam_member" "build_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+resource "google_project_iam_member" "build_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+# ------------------------------------------------------------------------------
+# 4. Agent-Specific Service Accounts (Legacy/Specific Agents)
 # ------------------------------------------------------------------------------
 resource "google_service_account" "sa_classifier" {
   account_id   = "sa-classifier"
