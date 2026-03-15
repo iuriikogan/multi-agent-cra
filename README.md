@@ -1,7 +1,5 @@
 # Multi-Agent Compliance Security Platform (CRA & DORA)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 A scalable, event-driven multi-agent system designed to assess Google Cloud infrastructure against the EU Cyber Resilience Act (CRA) and the Digital Operational Resilience Act (DORA). The goal is to provide Security Engineers with a real-time, dashboard-driven tool to monitor, audit, and enforce regulatory compliance across their GCP estate.
 
 ## Key Features
