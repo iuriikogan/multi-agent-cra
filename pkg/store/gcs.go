@@ -59,7 +59,7 @@ func (s *GCSStore) UpdateScanStatus(ctx context.Context, jobID, status string) e
 	if err != nil {
 		return err
 	}
-	
+
 	scan.Status = status
 	now := time.Now()
 	if status == "completed" || status == "failed" {

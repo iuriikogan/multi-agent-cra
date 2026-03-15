@@ -25,18 +25,26 @@ func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	if err := db.PingContext(ctx); err != nil {
+	pingCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(pingCtx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.ExecContext(pingCtx, `
 		CREATE TABLE IF NOT EXISTS scans (
 			job_id VARCHAR(255) PRIMARY KEY,
 			scope TEXT NOT NULL,
 			status VARCHAR(50) NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			completed_at DATETIME
-		);
+		)
+	`); err != nil {
+		return nil, fmt.Errorf("failed to initialize scans schema: %w", err)
+	}
+
+	if _, err := db.ExecContext(pingCtx, `
 		CREATE TABLE IF NOT EXISTS findings (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			job_id VARCHAR(255),
@@ -45,9 +53,9 @@ func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
 			details JSON NOT NULL,
 			INDEX (job_id),
 			FOREIGN KEY (job_id) REFERENCES scans(job_id)
-		);
+		)
 	`); err != nil {
-		return nil, fmt.Errorf("failed to initialize schema: %w", err)
+		return nil, fmt.Errorf("failed to initialize findings schema: %w", err)
 	}
 
 	return &CloudSQLStore{db: db}, nil

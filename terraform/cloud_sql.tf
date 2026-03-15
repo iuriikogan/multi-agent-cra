@@ -1,7 +1,7 @@
 # Package cloud_sql configures the managed database instance for findings storage.
 
 resource "google_sql_database_instance" "instance" {
-  name             = "cra-db-instance"
+  name             = "cra-mysql-instance"
   region           = var.region
   database_version = "MYSQL_8_0"
 

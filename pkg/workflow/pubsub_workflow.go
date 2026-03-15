@@ -18,10 +18,10 @@ import (
 
 // AgentTask holds the data transferred between assessment agents in the pipeline.
 type AgentTask struct {
-	JobID    string                `json:"job_id"`    // Unique ID for the scan job
-	Scope    string                `json:"scope"`     // Resource scope being assessed
-	Resource core.GCPResource      `json:"resource"`  // Target resource details
-	Result   core.AssessmentResult `json:"result"`    // Cumulative results from agents
+	JobID    string                `json:"job_id"`   // Unique ID for the scan job
+	Scope    string                `json:"scope"`    // Resource scope being assessed
+	Resource core.GCPResource      `json:"resource"` // Target resource details
+	Result   core.AssessmentResult `json:"result"`   // Cumulative results from agents
 }
 
 // PubSubWorkflow manages agent task distribution and status monitoring via Pub/Sub.
@@ -118,7 +118,7 @@ func (w *PubSubWorkflow) emitMonitoring(ctx context.Context, jobID, resourceName
 		"timestamp":     time.Now().Format(time.RFC3339),
 	}
 	data, _ := json.Marshal(event)
-	
+
 	publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 
@@ -168,7 +168,7 @@ func ProcessReporting(ctx context.Context, a agent.Agent, task *AgentTask) error
 	if err != nil {
 		return err
 	}
-	
+
 	cleanReport := sanitizeJSON(report)
 
 	var finding store.Finding

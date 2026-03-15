@@ -162,7 +162,7 @@ func (a *GeminiAgent) Chat(ctx context.Context, input string) (string, error) {
 		var respData map[string]interface{}
 		err = json.NewDecoder(resp.Body).Decode(&respData)
 		_ = resp.Body.Close()
-		
+
 		if err != nil {
 			return "", fmt.Errorf("failed to decode response: %w", err)
 		}

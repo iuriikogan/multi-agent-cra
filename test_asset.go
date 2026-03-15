@@ -1,9 +1,4 @@
 // Package . provides test_asset.go implementation.
-//
-// Rationale: This module is designed to encapsulate domain-specific logic,
-// ensuring strict separation of concerns within the multi-agent CRA architecture.
-// Terminology: CRA (Cyber Resilience Act), GCP (Google Cloud Platform), Agent (Autonomous AI actor).
-// Measurability: Ensures code maintainability and testability by isolating discrete workflow steps.
 package main
 
 import (
@@ -12,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"cloud.google.com/go/asset/apiv1"
+	asset "cloud.google.com/go/asset/apiv1"
 	"cloud.google.com/go/asset/apiv1/assetpb"
 	"google.golang.org/api/iterator"
 )

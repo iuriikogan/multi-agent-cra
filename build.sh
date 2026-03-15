@@ -128,8 +128,8 @@ if ! gcloud services vpc-peerings describe --network=cra-vpc --service=servicene
 fi
 
 echo "Ensuring Cloud SQL instance exists..."
-if ! gcloud sql instances describe cra-db-instance --project=$PROJECT_ID &>/dev/null; then
-  gcloud sql instances create cra-db-instance \
+if ! gcloud sql instances describe cra-mysql-instance --project=$PROJECT_ID &>/dev/null; then
+  gcloud sql instances create cra-mysql-instance \
       --database-version=MYSQL_8_0 \
       --tier=db-f1-micro \
       --region=$REGION \
@@ -138,13 +138,13 @@ if ! gcloud sql instances describe cra-db-instance --project=$PROJECT_ID &>/dev/
       --project=$PROJECT_ID
 fi
 
-if ! gcloud sql databases describe cra_db --instance=cra-db-instance --project=$PROJECT_ID &>/dev/null; then
-  gcloud sql databases create cra_db --instance=cra-db-instance --project=$PROJECT_ID
+if ! gcloud sql databases describe cra_db --instance=cra-mysql-instance --project=$PROJECT_ID &>/dev/null; then
+  gcloud sql databases create cra_db --instance=cra-mysql-instance --project=$PROJECT_ID
 fi
 
-if ! gcloud sql users describe cra_user --instance=cra-db-instance --host="%" --project=$PROJECT_ID &>/dev/null; then
+if ! gcloud sql users describe cra_user --instance=cra-mysql-instance --host="%" --project=$PROJECT_ID &>/dev/null; then
   gcloud sql users create cra_user \
-      --instance=cra-db-instance \
+      --instance=cra-mysql-instance \
       --password="change_me_in_production" \
       --host="%" \
       --project=$PROJECT_ID
@@ -158,7 +158,7 @@ for topic in scan-requests aggregator-topic modeler-topic validator-topic review
 done
 
 # Fetch dynamic values for Cloud Build substitutions if needed
-DB_IP=$(gcloud sql instances describe cra-db-instance --format='value(ipAddresses[0].ipAddress)' 2>/dev/null || echo "10.0.0.3")
+DB_IP="10.50.0.5"
 
 # Submit Cloud Build
 echo "Submitting Cloud Build..."
@@ -257,13 +257,17 @@ if ! gcloud compute backend-services describe cra-backend --global --project=$PR
       --protocol=HTTPS \
       --port-name=http \
       --load-balancing-scheme=EXTERNAL_MANAGED \
-      --security-policy=cra-security-policy \
       --project=$PROJECT_ID
 
   gcloud compute backend-services add-backend cra-backend \
       --global \
       --network-endpoint-group=cra-server-neg \
       --network-endpoint-group-region=$REGION \
+      --project=$PROJECT_ID
+
+  gcloud compute backend-services update cra-backend \
+      --global \
+      --security-policy=cra-security-policy \
       --project=$PROJECT_ID
 fi
 

@@ -23,6 +23,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import DownloadIcon from '@mui/icons-material/Download';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -32,6 +33,32 @@ interface Finding {
   status: string;        // Compliance state (e.g., Compliant, Non-Compliant)
   details: string;       // Detailed description of the assessment result
 }
+
+const theme = createTheme({
+  palette: {
+    primary: { main: '#6366f1' },
+    background: { default: '#f8fafc', paper: '#ffffff' },
+  },
+  typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+  },
+  shape: { borderRadius: 16 },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+          border: '1px solid #e2e8f0',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: { fontWeight: 600, backgroundColor: '#f8fafc', color: '#475569' },
+      },
+    },
+  },
+});
 
 // CRADashboard provides the main UI for visualizing and filtering compliance findings.
 export default function CRADashboard() {
@@ -179,6 +206,7 @@ export default function CRADashboard() {
   }
 
   return (
+    <ThemeProvider theme={theme}>
     <Box sx={{ p: 3 }}>
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
@@ -259,5 +287,6 @@ export default function CRADashboard() {
         </Grid>
       </Grid>
     </Box>
+    </ThemeProvider>
   );
 }

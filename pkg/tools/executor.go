@@ -106,6 +106,7 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 
 	it := client.SearchAllResources(ctx, req)
 	var result []map[string]interface{}
+	count := 0
 
 	for {
 		asset, err := it.Next()
@@ -122,8 +123,12 @@ func (e *DefaultExecutor) listGCPAssets(ctx context.Context, args map[string]int
 			"location":   asset.Location,
 		}
 		result = append(result, entry)
-	}
 
+		count++
+		if count >= 5 {
+			break
+		}
+	}
 	finalJSON, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Sprintf("Error marshaling result: %v", err), nil

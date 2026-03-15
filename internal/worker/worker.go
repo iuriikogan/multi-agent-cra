@@ -97,7 +97,7 @@ The output should be a JSON object with the following fields: 'resource_name', '
 	wf.RegisterPushHandler(mux, "/pubsub/reporter", "", reporterAgent, workflow.ProcessReporting)
 
 	slog.Info("Worker routes registered. Listening for push requests...")
-	
+
 	mux.HandleFunc("/pubsub/scan-requests", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -166,7 +166,7 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 	}
 
 	jsonStr := listResp
-	
+
 	type Asset struct {
 		Name      string `json:"name"`
 		AssetType string `json:"asset_type"`
@@ -203,6 +203,7 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 		}
 	}
 
+	batchSize := 10
 	for i, a := range assets {
 		task := workflow.AgentTask{
 			JobID: jobID,
@@ -214,6 +215,12 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 		taskData, _ := json.Marshal(task)
 		if err := pubsubClient.Publish(ctx, cfg.PubSub.TopicAggregator, taskData); err != nil {
 			slog.Error("Failed to publish aggregator task", "error", err)
+		}
+
+		// Rate limit: small pause every batchSize to avoid flooding Pub/Sub and AI endpoints
+		if (i+1)%batchSize == 0 {
+			slog.Info("Throttling task publication", "index", i, "total", len(assets))
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 	return nil

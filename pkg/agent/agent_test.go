@@ -27,4 +27,3 @@ func TestGeminiAgent_Name_Role(t *testing.T) {
 		t.Errorf("expected role 'tester', got %s", a.Role())
 	}
 }
-
