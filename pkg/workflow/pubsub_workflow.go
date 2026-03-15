@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
-	"github.com/iuriikogan/multi-agent-cra/pkg/core"
-	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
-	"github.com/iuriikogan/multi-agent-cra/pkg/store"
+	"github.com/iuriikogan/Audit-Agent/pkg/agent"
+	"github.com/iuriikogan/Audit-Agent/pkg/core"
+	"github.com/iuriikogan/Audit-Agent/pkg/queue"
+	"github.com/iuriikogan/Audit-Agent/pkg/store"
 )
 
 // AgentTask holds the data transferred between assessment agents in the pipeline.

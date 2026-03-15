@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/iuriikogan/multi-agent-cra/pkg/config"
+	"github.com/iuriikogan/Audit-Agent/pkg/config"
 )
 
 func TestRegisterRoutes_Compilation(t *testing.T) {

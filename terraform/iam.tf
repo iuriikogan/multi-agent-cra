@@ -20,6 +20,12 @@ resource "google_project_iam_member" "server_sql_client" {
   member  = "serviceAccount:${google_service_account.server_sa.email}"
 }
 
+resource "google_project_iam_member" "server_trace_agent" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.server_sa.email}"
+}
+
 # ------------------------------------------------------------------------------
 # 2. Worker Service Account
 # ------------------------------------------------------------------------------
@@ -49,6 +55,12 @@ resource "google_project_iam_member" "worker_ai_user" {
 resource "google_project_iam_member" "worker_asset_viewer" {
   project = var.project_id
   role    = "roles/cloudasset.viewer"
+  member  = "serviceAccount:${google_service_account.worker_sa.email}"
+}
+
+resource "google_project_iam_member" "worker_trace_agent" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
   member  = "serviceAccount:${google_service_account.worker_sa.email}"
 }
 

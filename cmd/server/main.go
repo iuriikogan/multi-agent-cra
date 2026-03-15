@@ -12,13 +12,13 @@ import (
 	"embed"
 	"io/fs"
 
-	"github.com/iuriikogan/multi-agent-cra/internal/server"
-	"github.com/iuriikogan/multi-agent-cra/internal/worker"
-	"github.com/iuriikogan/multi-agent-cra/pkg/config"
-	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
-	"github.com/iuriikogan/multi-agent-cra/pkg/observability"
-	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
-	"github.com/iuriikogan/multi-agent-cra/pkg/store"
+	"github.com/iuriikogan/Audit-Agent/internal/server"
+	"github.com/iuriikogan/Audit-Agent/internal/worker"
+	"github.com/iuriikogan/Audit-Agent/pkg/config"
+	"github.com/iuriikogan/Audit-Agent/pkg/logger"
+	"github.com/iuriikogan/Audit-Agent/pkg/observability"
+	"github.com/iuriikogan/Audit-Agent/pkg/queue"
+	"github.com/iuriikogan/Audit-Agent/pkg/store"
 )
 
 //go:embed out

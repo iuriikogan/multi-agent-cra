@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/iuriikogan/multi-agent-cra/pkg/core"
+	"github.com/iuriikogan/Audit-Agent/pkg/core"
 )
 
 func TestGenerateCSV(t *testing.T) {

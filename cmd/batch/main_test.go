@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/iuriikogan/multi-agent-cra/internal/batch"
+	"github.com/iuriikogan/Audit-Agent/internal/batch"
 )
 
 func TestRunBatch_CompileCheck(t *testing.T) {

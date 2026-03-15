@@ -135,3 +135,6 @@ substitutions:
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

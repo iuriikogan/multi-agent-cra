@@ -14,9 +14,9 @@ import (
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"cloud.google.com/go/pubsub/v2/pstest"
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/iuriikogan/multi-agent-cra/pkg/config"
-	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
-	"github.com/iuriikogan/multi-agent-cra/pkg/store"
+	"github.com/iuriikogan/Audit-Agent/pkg/config"
+	"github.com/iuriikogan/Audit-Agent/pkg/queue"
+	"github.com/iuriikogan/Audit-Agent/pkg/store"
 )
 
 type mockStore struct {
@@ -249,6 +249,50 @@ func TestFindingsEndpoint(t *testing.T) {
 	if len(findings) != 2 {
 		t.Errorf("expected 2 findings, got %v", len(findings))
 	}
+	_ = db.Close()
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled expectations: %s", err)
+	}
+}
+
+func TestSPARouting(t *testing.T) {
+	handler, mock, _, db := setupTestEnv(t)
+	mock.ExpectClose()
+
+	tests := []struct {
+		name           string
+		path           string
+		expectedStatus int
+	}{
+		{
+			name:           "API path should not fallback",
+			path:           "/api/nonexistent",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "Next.js asset path should not fallback",
+			path:           "/_next/static/chunks/main.js",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "Random path should fallback to index.html",
+			path:           "/random-route",
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("%s: expected status %v, got %v", tt.name, tt.expectedStatus, w.Code)
+			}
+		})
+	}
+
 	_ = db.Close()
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unfulfilled expectations: %s", err)

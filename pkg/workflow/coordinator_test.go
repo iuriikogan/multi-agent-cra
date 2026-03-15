@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
-	"github.com/iuriikogan/multi-agent-cra/pkg/core"
+	"github.com/iuriikogan/Audit-Agent/pkg/agent"
+	"github.com/iuriikogan/Audit-Agent/pkg/core"
 )
 
 // Ensure MockAgent implements the interface

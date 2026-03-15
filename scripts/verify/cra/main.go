@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/iuriikogan/multi-agent-cra/pkg/knowledge"
+	"github.com/iuriikogan/Audit-Agent/pkg/knowledge"
 	"google.golang.org/api/option"
 )
 

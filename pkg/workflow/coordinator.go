@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
-	"github.com/iuriikogan/multi-agent-cra/pkg/core"
+	"github.com/iuriikogan/Audit-Agent/pkg/agent"
+	"github.com/iuriikogan/Audit-Agent/pkg/core"
 )
 
 // Coordinator orchestrates the sequential execution of specialized agents.

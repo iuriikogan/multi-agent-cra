@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
-	"github.com/iuriikogan/multi-agent-cra/pkg/core"
+	"github.com/iuriikogan/Audit-Agent/pkg/agent"
+	"github.com/iuriikogan/Audit-Agent/pkg/core"
 )
 
 // GenerateCSV creates a CSV report summarizing the assessment results.

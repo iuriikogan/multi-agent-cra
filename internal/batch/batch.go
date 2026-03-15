@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/iuriikogan/multi-agent-cra/pkg/agent"
-	"github.com/iuriikogan/multi-agent-cra/pkg/config"
-	"github.com/iuriikogan/multi-agent-cra/pkg/core"
-	"github.com/iuriikogan/multi-agent-cra/pkg/tools"
-	"github.com/iuriikogan/multi-agent-cra/pkg/workflow"
+	"github.com/iuriikogan/Audit-Agent/pkg/agent"
+	"github.com/iuriikogan/Audit-Agent/pkg/config"
+	"github.com/iuriikogan/Audit-Agent/pkg/core"
+	"github.com/iuriikogan/Audit-Agent/pkg/tools"
+	"github.com/iuriikogan/Audit-Agent/pkg/workflow"
 )
 
 // Run executes a full assessment scan on a specified resource scope in batch mode.

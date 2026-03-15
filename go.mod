@@ -1,4 +1,4 @@
-module github.com/iuriikogan/multi-agent-cra
+module github.com/iuriikogan/Audit-Agent
 
 go 1.25.0
 

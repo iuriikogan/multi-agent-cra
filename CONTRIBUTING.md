@@ -1,11 +1,11 @@
-# Contributing to Multi-Agent Compliance System (CRA & DORA)
+# Contributing to Audit-Agent (CRA & DORA)
 
 Thank you for your interest in contributing! We welcome contributions from the community to help improve the security and resilience of our systems.
 
 ## Getting Started
 
 1.  **Fork the repository** on GitHub.
-2.  **Clone your fork** locally: `git clone https://github.com/your-username/multi-agent-cra.git`
+2.  **Clone your fork** locally: `git clone https://github.com/your-username/Audit-Agent.git`
 3.  **Create a new branch** for your feature or bug fix: `git checkout -b my-new-feature`
 
 ## Code Style

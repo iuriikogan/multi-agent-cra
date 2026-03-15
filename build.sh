@@ -72,6 +72,9 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:compliance-server-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/cloudsql.client" --condition=None >/dev/null || true
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:compliance-server-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/cloudtrace.agent" --condition=None >/dev/null || true
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:compliance-worker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
@@ -85,6 +88,9 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:compliance-worker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/cloudasset.viewer" --condition=None >/dev/null || true
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:compliance-worker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/cloudtrace.agent" --condition=None >/dev/null || true
 
 for sa in sa-classifier sa-auditor sa-vuln sa-reporter; do
   gcloud projects add-iam-policy-binding $PROJECT_ID \

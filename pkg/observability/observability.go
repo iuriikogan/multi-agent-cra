@@ -24,7 +24,7 @@ func InitTrace(ctx context.Context, projectID string) error {
 
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String("multi-agent-cra"),
+			semconv.ServiceNameKey.String("Audit-Agent"),
 		),
 		resource.WithHost(),
 		resource.WithTelemetrySDK(),

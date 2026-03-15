@@ -13,7 +13,7 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
   
 ## High-Level System Architecture and Data Flow
 
-##### Detailed Architecture can be found in [ARCHITECTURE.md](https://github.com/iuriikogan/multi-agent-cra/blob/main/ARCHITECTURE.md)
+##### Detailed Architecture can be found in [ARCHITECTURE.md](https://github.com/iuriikogan/Audit-Agent/blob/main/ARCHITECTURE.md)
 
 The system uses a strictly decoupled producer-consumer model:
 
@@ -28,7 +28,7 @@ The system uses a strictly decoupled producer-consumer model:
 ### Security Controls
 *   Least Privilege: Workers operate using dedicated Google Service Accounts with minimal permissions required for Asset Inventory and Pub/Sub.
 *   No Hardcoded Secrets: API keys and Database URLs are injected securely at runtime via environment variables.
-*   Network Isolation: Cloud SQL instances should be deployed with private IPs. The cra-worker does not expose any inbound ports.
+*   Network Isolation: Cloud SQL instances should be deployed with private IPs. The compliance-worker does not expose any inbound ports.
 
 ## Project Structure
 

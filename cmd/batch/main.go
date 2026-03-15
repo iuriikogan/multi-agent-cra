@@ -14,10 +14,10 @@ import (
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 
-	"github.com/iuriikogan/multi-agent-cra/internal/batch"
-	"github.com/iuriikogan/multi-agent-cra/pkg/config"
-	"github.com/iuriikogan/multi-agent-cra/pkg/logger"
-	"github.com/iuriikogan/multi-agent-cra/pkg/observability"
+	"github.com/iuriikogan/Audit-Agent/internal/batch"
+	"github.com/iuriikogan/Audit-Agent/pkg/config"
+	"github.com/iuriikogan/Audit-Agent/pkg/logger"
+	"github.com/iuriikogan/Audit-Agent/pkg/observability"
 )
 
 // main initializes dependencies and executes the batch analysis workflow.

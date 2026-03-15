@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iuriikogan/multi-agent-cra/pkg/config"
-	"github.com/iuriikogan/multi-agent-cra/pkg/queue"
-	"github.com/iuriikogan/multi-agent-cra/pkg/store"
+	"github.com/iuriikogan/Audit-Agent/pkg/config"
+	"github.com/iuriikogan/Audit-Agent/pkg/queue"
+	"github.com/iuriikogan/Audit-Agent/pkg/store"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -140,7 +141,25 @@ func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.
 		}
 	})
 
-	apiMux.Handle("/", http.FileServer(staticFS))
+	// Custom handler for SPA routing: if a file doesn't exist and isn't an API/_next path, serve index.html
+	fileServer := http.FileServer(staticFS)
+	apiMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		// Do not redirect API or Next.js core assets to index.html
+		if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/_next/") {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		f, err := staticFS.Open(path)
+		if err != nil {
+			// Fallback to index.html for SPA routing
+			r.URL.Path = "/"
+		} else {
+			f.Close()
+		}
+		fileServer.ServeHTTP(w, r)
+	}))
 
 	corsMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
