@@ -68,7 +68,3 @@ Before deploying the application locally or in production, ensure the following 
 #### [Deployment Options](https://github.com/iuriikogan/multi-agent-cra/DEPLOY.md)
 
 #### [Architecture](https://github.com/iuriikogan/multi-agent-cra/blob/main/ARCHITECTURE.md)
-
-#### [Contributing](https://github.com/iuriikogan/multi-agent-cra/blob/main/CONTRIBUTING.md)
-
-#### [Security](https://github.com/iuriikogan/multi-agent-cra/blob/main/SECURITY.md)
