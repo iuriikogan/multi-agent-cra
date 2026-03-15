@@ -10,10 +10,9 @@ A scalable, event-driven multi-agent system designed to assess Google Cloud infr
 *   Integrated Regulatory Knowledge Bases: Vector-searchable knowledge bases for both the EU Cyber Resilience Act (CRA) and Digital Operational Resilience Act (DORA), integrated into the agent workflow for high-fidelity compliance reasoning.
 *   Real-time Dashboard: A Next.js frontend embedded in the Go binary featuring live Server-Sent Events (SSE) log streaming, interactive compliance charts, and framework-specific filtering.
 *   Event-Driven: Decoupled architecture using Google Cloud Pub/Sub for resilient, multi-stage agent pipelines.
-*   Flexible Storage: Choose between robust Cloud SQL (PostgreSQL) for production or lightweight in-memory SQLite for zero-dependency local development.
-*   Full-stack Observability: Integrated OpenTelemetry tracing and structured logging with Google Cloud Trace and Cloud Logging correlation.
   
-## System Architecture and Data Flow
+## High-Level System Architecture and Data Flow
+#####    (Detailed Architecture can be found in ARCHITECTURE.md)
 
 The system uses a strictly decoupled producer-consumer model:
 
@@ -65,46 +64,10 @@ Before deploying the application locally or in production, ensure the following 
 *   A valid Gemini API Key.
 *   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com, sqladmin.googleapis.com, cloudtrace.googleapis.com.
 
-## Steps
+## [Deployment Options](https://github.com/iuriikogan/multi-agent-cra/DEPLOY.md)
 
-### Local Deployment
+## [Architecture](https://github.com/iuriikogan/multi-agent-cra/blob/main/ARCHITECTURE.md)
 
-1.  Set the required environment variables:
-    ```bash
-    export GEMINI_API_KEY="your_actual_api_key_here"
-    export PROJECT_ID="your-gcp-project-id"
-    export ROLE="all"
-    export DATABASE_TYPE="SQLITE_MEM"
-    ```
-2.  Run the application:
-    ```bash
-    go run ./cmd/server
-    ```
+## [Contributing](https://github.com/iuriikogan/multi-agent-cra/blob/main/CONTRIBUTING.md)
 
-### Cloud Run Deployment
-
-For production deployments to Google Cloud Run, execute the unified build script which orchestrates Terraform and Cloud Build:
-
-```bash
-./build.sh
-```
-
-This will automatically provision your VPC, Cloud SQL instance, IAM roles, and deploy the services.
-
-## Verification
-
-To verify the deployment:
-
-1.  Proxy the service to your localhost via gcloud cli to make it available at localhost:8080
-2.  Initiate a test scan from the UI.
-3.  Check the server logs to ensure Pub/Sub messages are being processed and the state is written to the database without errors.
-
-## Rollback
-
-To tear down all resources and roll back the deployment in GCP:
-
-1.  Run the build script with the destroy flag:
-    ```bash
-    ./build.sh --destroy
-    ```
-2.  (Local) Stop the running process (Ctrl+C).
+## [Security](https://github.com/iuriikogan/multi-agent-cra/blob/main/SECURITY.md)

@@ -181,7 +181,7 @@ sequenceDiagram
 
 The system abstracts state management through a `Store` interface, allowing flexibility based on deployment needs:
 
-*   **Cloud SQL (PostgreSQL):** Used for production. Provides robust, concurrent transaction support and complex querying capabilities for the Compliance Dashboard. Database connections are secured via SSL and private IP.
+*   **Cloud SQL** Used for production. Provides robust, concurrent transaction support and complex querying capabilities for the CRA Dashboard. Database connections are secured via SSL and private IP.
 *   **SQLite (In-Memory):** Used for local development and CI/CD pipelines. It provides a zero-dependency, ephemeral database that perfectly mimics the relational structure of Cloud SQL.
 
 The frontend dashboard queries this state via the `/api/findings` endpoint, pulling historical compliance data independently of the real-time Pub/Sub pipeline.
