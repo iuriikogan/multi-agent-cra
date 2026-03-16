@@ -120,7 +120,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 echo "Ensuring Secret Manager secret exists..."
 if ! gcloud secrets describe GEMINI_API_KEY --project=$PROJECT_ID &>/dev/null; then
-  gcloud secrets create GEMINI_API_KEY --replication-policy=\"automatic\" --project=$PROJECT_ID
+  gcloud secrets create GEMINI_API_KEY --replication-policy=automatic --project=$PROJECT_ID
 fi
 
 if ! gcloud secrets versions describe latest --secret=GEMINI_API_KEY --project=$PROJECT_ID &>/dev/null; then
