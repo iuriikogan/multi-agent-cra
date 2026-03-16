@@ -2,46 +2,7 @@
 
 This document describes the technical architecture of the Multi-Agent Regulatory Compliance System (supporting CRA and DORA).
 
-## Deployment Options
-
-The system can be deployed using one of two mutually exclusive deployment paths. Both options deploy identical Cloud Run configurations (service accounts, VPC connectors, internal ingress for workers, pub/sub settings).
-
-### Option A: Cloud Build (Application-Focused)
-
-This option uses the `build.sh` script to trigger `cloudbuild.yaml`. It is ideal for rapid application updates and assumes that the underlying GCP infrastructure (VPC, Cloud SQL, Pub/Sub, Service Accounts) has already been provisioned.
-
-```mermaid
-sequenceDiagram
-    participant Developer
-    participant BuildScript as build.sh
-    participant CloudBuild as Google Cloud Build
-    participant ArtifactRegistry as Artifact Registry
-    participant CloudRun as Google Cloud Run
-
-    Developer->>BuildScript: Execute
-    BuildScript->>CloudBuild: gcloud builds submit
-    CloudBuild->>CloudBuild: Build Docker Images (Server & Worker)
-    CloudBuild->>ArtifactRegistry: Push Images
-    CloudBuild->>CloudRun: gcloud run deploy (Server & Worker)
-    Note over CloudRun: Connects to existing DB, VPC, and Pub/Sub
-```
-
-### Option B: Terraform (Infrastructure as Code)
-
-This option uses Terraform to provision the entire GCP environment (Networking, DB, Pub/Sub, IAM) alongside the Cloud Run services from scratch in a declarative manner.
-
-```mermaid
-sequenceDiagram
-    participant Developer
-    participant Terraform
-    participant GCP_Infra as GCP Infrastructure (VPC, SQL, IAM)
-    participant CloudRun as Google Cloud Run
-
-    Developer->>Terraform: terraform apply
-    Terraform->>GCP_Infra: Provision Networking, Databases, and Secrets
-    Terraform->>CloudRun: Deploy Server & Worker Services
-    Note over CloudRun: Cloud Run services pull pre-built images or rely on CI/CD
-```
+### [Deployment Instructions](https://github.com/iuriikogan/Audit-Agent/blob/main/DEPLOY.md)
 
 ## High-Level System Architecture
 
@@ -170,7 +131,7 @@ sequenceDiagram
         *   Agent-Specific Accounts (`sa-classifier`, `sa-auditor`, `sa-vuln`, `sa-reporter`): Available for fine-grained execution where individual agents run in isolated contexts.
     *   **Pub/Sub Push Authentication**: All internal agent communication uses Pub/Sub **Push Subscriptions** with OIDC token authentication. The worker services validate these tokens, ensuring that only the authorized Pub/Sub service can trigger agent logic.
 3.  **Network Isolation:** 
-    *   **Private Cloud SQL**: The PostgreSQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
+    *   **Private Cloud SQL**: The mySQL database is deployed with a private IP within a Virtual Private Cloud (VPC), inaccessible from the public internet.
     *   **Serverless VPC Access**: Cloud Run services use a dedicated VPC Connector to securely reach the private database.
 4.  **Ingress Protection:**
     *   The **Worker Fleet** is configured with `ingress = internal`, preventing direct access from the public internet.
