@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/iuriikogan/Audit-Agent/pkg/agent"
 	"github.com/iuriikogan/Audit-Agent/pkg/config"
 	"github.com/iuriikogan/Audit-Agent/pkg/core"
@@ -18,13 +17,13 @@ import (
 	"github.com/iuriikogan/Audit-Agent/pkg/store"
 	"github.com/iuriikogan/Audit-Agent/pkg/tools"
 	"github.com/iuriikogan/Audit-Agent/pkg/workflow"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 // RegisterRoutes configures HTTP and Pub/Sub handlers for worker agents.
 // It returns a cleanup function to release agent resources and an error if initialization fails.
 func RegisterRoutes(ctx context.Context, mux *http.ServeMux, cfg *config.Config, pubsubClient *queue.Client, db store.Store) (func(), error) {
-	genaiClient, err := genai.NewClient(ctx, option.WithAPIKey(cfg.APIKey))
+	genaiClient, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: cfg.APIKey})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
 	}
@@ -84,7 +83,6 @@ The output should be a JSON object with the following fields: 'resource_name', '
 		_ = reviewerAgent.Close()
 		_ = taggerAgent.Close()
 		_ = reporterAgent.Close()
-		_ = genaiClient.Close()
 	}
 
 	wf := workflow.NewPubSubWorkflow(pubsubClient, db, cfg.PubSub.TopicMonitoring)
@@ -202,6 +200,11 @@ func runScan(ctx context.Context, cfg *config.Config, pubsubClient *queue.Client
 				}
 			}
 		}
+	}
+
+	if len(assets) > 10 {
+		slog.Info("Limiting assets to 10 for demo purposes", "original_count", len(assets))
+		assets = assets[:10]
 	}
 
 	batchSize := 10

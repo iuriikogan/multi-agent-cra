@@ -1,7 +1,7 @@
 // Package tools defines the functional capabilities accessible to agents.
 package tools
 
-import "github.com/google/generative-ai-go/genai"
+import "google.golang.org/genai"
 
 // Tool sets are organized by agent responsibility to enforce the principle of least privilege.
 

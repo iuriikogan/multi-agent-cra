@@ -6,9 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/iuriikogan/Audit-Agent/pkg/knowledge"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 func main() {
@@ -18,13 +17,10 @@ func main() {
 	}
 
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
 	if err != nil {
 		log.Fatalf("failed to create client: %v", err)
 	}
-	defer func() {
-		_ = client.Close()
-	}()
 
 	fmt.Println("Searching for: 'reporting obligations' in CRA...")
 	chunks, err := knowledge.Search(ctx, client, "reporting obligations", knowledge.RegulationCRA, 2)

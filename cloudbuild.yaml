@@ -1,53 +1,4 @@
 steps:
-  # --- PREPARATION ---
-  # Ensure cache bucket exists (swallow error if already exists)
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Prepare Cache'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        gsutil mb -l ${_REGION} gs://${PROJECT_ID}-build-cache || true
-    waitFor: ['-']
-
-  # --- FRONTEND BUILD ---
-  # Fetch node_modules from cache
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Fetch Frontend Cache'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        gsutil cp gs://${PROJECT_ID}-build-cache/multi-agent-compliance/web-node-modules.tar.gz . || echo "No cache found"
-        if [ -f web-node-modules.tar.gz ]; then tar -xzf web-node-modules.tar.gz; fi
-    waitFor: ['Prepare Cache']
-
-  - name: 'node:22-alpine'
-    id: 'Install Frontend'
-    entrypoint: 'npm'
-    args: ['install']
-    dir: 'web'
-    waitFor: ['Fetch Frontend Cache']
-
-  - name: 'node:22-alpine'
-    id: 'Build Frontend'
-
-    entrypoint: 'npm'
-    args: ['run', 'build']
-    dir: 'web'
-    waitFor: ['Install Frontend']
-
-  # Save node_modules to cache in parallel with the rest of the build
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Save Frontend Cache'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        tar -czf web-node-modules.tar.gz web/node_modules
-        gsutil cp web-node-modules.tar.gz gs://${PROJECT_ID}-build-cache/multi-agent-compliance/web-node-modules.tar.gz
-    waitFor: ['Install Frontend']
-
   # --- DOCKER BUILDS (Using Kaniko for optimized caching) ---
   - name: 'gcr.io/kaniko-project/executor:latest'
     id: 'Build Server'
@@ -55,9 +6,9 @@ steps:
       - '--destination=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
       - '--cache=true'
       - '--cache-ttl=24h'
-      - '--build-arg=TARGET=server'
+      - '--target=server'
       - '--context=dir:///workspace'
-    waitFor: ['Build Frontend']
+    waitFor: ['-']
 
   - name: 'gcr.io/kaniko-project/executor:latest'
     id: 'Build Worker'
@@ -65,9 +16,9 @@ steps:
       - '--destination=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
       - '--cache=true'
       - '--cache-ttl=24h'
-      - '--build-arg=TARGET=worker'
+      - '--target=worker'
       - '--context=dir:///workspace'
-    waitFor: ['Build Frontend']
+    waitFor: ['-']
 
   # --- DEPLOYMENT ---
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -93,7 +44,7 @@ steps:
       - '--set-env-vars'
       - 'DATABASE_URL=compliance_user:change_me_in_production@tcp(${_DB_IP}:3306)/compliance_db?parseTime=true'
       - '--set-env-vars'
-      - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
+      - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub,PUBSUB_TOPIC_AGGREGATOR=aggregator-topic,PUBSUB_TOPIC_MODELER=modeler-topic,PUBSUB_TOPIC_VALIDATOR=validator-topic,PUBSUB_TOPIC_REVIEWER=reviewer-topic,PUBSUB_TOPIC_TAGGER=tagger-topic,PUBSUB_TOPIC_REPORTER=reporter-topic,PUBSUB_TOPIC_MONITORING=monitoring-topic'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
       - '--no-allow-unauthenticated'
@@ -121,7 +72,7 @@ steps:
       - '--set-env-vars'
       - 'DATABASE_URL=compliance_user:change_me_in_production@tcp(${_DB_IP}:3306)/compliance_db?parseTime=true'
       - '--set-env-vars'
-      - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub'
+      - 'PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests,PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub,PUBSUB_TOPIC_AGGREGATOR=aggregator-topic,PUBSUB_TOPIC_MODELER=modeler-topic,PUBSUB_TOPIC_VALIDATOR=validator-topic,PUBSUB_TOPIC_REVIEWER=reviewer-topic,PUBSUB_TOPIC_TAGGER=tagger-topic,PUBSUB_TOPIC_REPORTER=reporter-topic,PUBSUB_TOPIC_MONITORING=monitoring-topic'
       - '--set-secrets'
       - 'GEMINI_API_KEY=GEMINI_API_KEY:latest'
       - '--no-allow-unauthenticated'

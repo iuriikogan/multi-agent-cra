@@ -1,25 +1,59 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
-import { 
-  Grid, Paper, Typography, Box, TextField, Button, 
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip, CircularProgress, Alert, Fade, Stack
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Grid,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Button,
+  CircularProgress,
+  SelectChangeEvent,
+  Stack,
+  Alert,
+  Fade,
+  TextField,
+  Tooltip,
+  IconButton,
+  AppBar,
+  Toolbar,
+  Container,
+  Tabs,
+  Tab,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
-import SecurityIcon from '@mui/icons-material/Security';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import TerminalIcon from '@mui/icons-material/Terminal';
-import AssessmentIcon from '@mui/icons-material/Assessment';
+import {
+  Share,
+  Download,
+  PlayArrow,
+  CheckCircle,
+  Error as ErrorIcon,
+  Terminal,
+  Assessment,
+  Security,
+  Insights,
+} from '@mui/icons-material';
+import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
+import { Doughnut } from 'react-chartjs-2';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, ChartTooltip, Legend);
 
+// --- Type Definitions ---
 interface Finding {
   resource_name: string;
   status: string;
   details: string;
-  regulation: string; // Added field
+  regulation: string;
 }
 
 interface ScanResult {
@@ -39,79 +73,126 @@ interface MonitoringEvent {
   timestamp: string;
 }
 
+// --- Helper Functions ---
+const extractHierarchy = (resourceName: string) => {
+  const parts = resourceName.split('/');
+  let org = 'Unknown', folder = 'Unknown', proj = 'Unknown';
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (parts[i] === 'organizations') org = parts[i + 1];
+    else if (parts[i] === 'folders') folder = parts[i + 1];
+    else if (parts[i] === 'projects') proj = parts[i + 1];
+  }
+  return { org, folder, proj };
+};
+
+const isCompliant = (status: string) => status.toLowerCase() === 'compliant' || status.toLowerCase() === 'pass';
+const isNonCompliant = (status: string) => status.toLowerCase() === 'non_compliant' || status.toLowerCase() === 'non-compliant' || status.toLowerCase() === 'fail';
+
+// --- Main Dashboard Component ---
 export default function Dashboard() {
-  const [scope, setScope] = useState('projects/crc-demos-489818');
+  const [currentTab, setCurrentTab] = useState(0);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
+
+  return (
+    <Box sx={{ flexGrow: 1 }}>
+      <AppBar position="static" elevation={0} sx={{ backgroundColor: 'background.paper' }}>
+        <Toolbar>
+          <Security sx={{ mr: 2, color: 'primary.main' }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Compliance Dashboard
+          </Typography>
+        </Toolbar>
+        <Tabs value={currentTab} onChange={handleTabChange} indicatorColor="primary" textColor="primary" variant="fullWidth">
+          <Tab label="Compliance Overview" icon={<Assessment />} iconPosition="start" />
+          <Tab label="Live Scan & Logs" icon={<Terminal />} iconPosition="start" />
+        </Tabs>
+      </AppBar>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        {currentTab === 0 && <ComplianceOverview />}
+        {currentTab === 1 && <LiveScan />}
+      </Container>
+    </Box>
+  );
+}
+
+// --- Compliance Overview Tab ---
+function ComplianceOverview() {
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    org: 'All',
+    folder: 'All',
+    project: 'All',
+    regulation: 'All',
+  });
+
+  const fetchFindings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/findings');
+      if (res.ok) {
+        setFindings(await res.json() || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch findings", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFindings();
+  }, [fetchFindings]);
+
+  const filteredFindings = useMemo(() => {
+    return findings.filter(f => {
+      const { org, folder, proj } = extractHierarchy(f.resource_name);
+      if (filters.org !== 'All' && org !== filters.org) return false;
+      if (filters.folder !== 'All' && folder !== filters.folder) return false;
+      if (filters.project !== 'All' && proj !== filters.project) return false;
+      if (filters.regulation !== 'All' && f.regulation !== filters.regulation) return false;
+      return true;
+    });
+  }, [findings, filters]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Grid container spacing={3}>
+      <Grid item xs={12}>
+        <FilterControls findings={findings} filters={filters} setFilters={setFilters} />
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <ComplianceChart findings={filteredFindings} />
+      </Grid>
+      <Grid item xs={12} md={8}>
+        <ActionToolbar findings={filteredFindings} />
+      </Grid>
+      <Grid item xs={12}>
+        <FindingsTable findings={filteredFindings} />
+      </Grid>
+    </Grid>
+  );
+}
+
+// --- Live Scan Tab ---
+function LiveScan() {
+  const [scope, setScope] = useState('projects/your-gcp-project-id');
   const [regulation, setRegulation] = useState('CRA');
   const [jobId, setJobId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<MonitoringEvent[]>([]);
-  const logEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const fetchAllFindings = async () => {
-      try {
-        const res = await fetch('/api/findings');
-        if (res.ok) {
-          const findingsData = await res.json();
-          setScanResult({
-            job_id: 'historical',
-            scope: 'all',
-            status: 'completed',
-            findings: findingsData || [],
-            created_at: new Date().toISOString()
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching historical findings", err);
-      }
-    };
-    fetchAllFindings();
-  }, []);
-
-  // Auto-scroll the terminal
-  useEffect(() => {
-    if (logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [events]);
-
-  useEffect(() => {
-    const eventSource = new EventSource('/api/stream');
-    eventSource.onmessage = (event) => {
-      try {
-        const data: MonitoringEvent = JSON.parse(event.data);
-        setEvents((prev) => [data, ...prev].slice(0, 100)); 
-
-        if (jobId && data.job_id === jobId && data.status === 'completed' && data.agent_name === 'Reporter') {
-           setTimeout(() => fetchScanResult(jobId), 500);
-        }
-      } catch (err) {
-        console.error("Failed to parse SSE data", err);
-      }
-    };
-    eventSource.onerror = (err) => {
-      console.error("SSE Error", err);
-      eventSource.close();
-    };
-    return () => eventSource.close();
-  }, [jobId]);
-
-  const fetchScanResult = async (id: string) => {
-    try {
-      const res = await fetch(`/api/scan?id=${id}`);
-      if (res.ok) {
-        const data: ScanResult = await res.json();
-        setScanResult(data);
-        if (data.status === 'completed' || data.status === 'failed') {
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching scan result", err);
-    }
-  };
 
   const handleScan = async () => {
     setLoading(true);
@@ -134,196 +215,303 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
-
-  const isCompliant = (s: string) => ['true', 'compliant', 'approved', 'conformant'].includes(s.toLowerCase());
-  const isNonCompliant = (s: string) => ['false', 'non-compliant', 'failed', 'rejected', 'non-conformant'].includes(s.toLowerCase());
-
-  const findings = scanResult?.findings || [];
-
-  const { compliantCount, nonCompliantCount, totalCount } = useMemo(() => {
-
-    const fArr = scanResult?.findings || [];
-    let comp = 0, nonComp = 0;
-    fArr.forEach(f => {
-      if (isCompliant(f.status)) comp++;
-      else if (isNonCompliant(f.status)) nonComp++;
-    });
-    return {
-      compliantCount: comp,
-      nonCompliantCount: nonComp,
-      totalCount: fArr.length
-    };
-  }, [scanResult]);
   
-  const chartData = useMemo(() => ({
-    labels: ['Conformant', 'Non-Conformant'],
-    datasets: [{
-      data: [compliantCount, nonCompliantCount],
-      backgroundColor: ['#34a85399', '#d9302599'],
-      borderWidth: 0,
-      hoverOffset: 4,
-    }],
-  }), [compliantCount, nonCompliantCount]);
+  const fetchScanResult = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/scan?id=${id}`);
+      if (res.ok) {
+        const data: ScanResult = await res.json();
+        setScanResult(data);
+        if (['completed', 'failed'].includes(data.status)) {
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching scan result", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const eventSource = new EventSource('/api/stream');
+    eventSource.onmessage = (event) => {
+      try {
+        const data: MonitoringEvent = JSON.parse(event.data);
+        setEvents((prev) => [data, ...prev].slice(0, 100)); 
+
+        if (jobId && data.job_id === jobId && data.status === 'completed' && data.agent_name === 'Reporter') {
+           setTimeout(() => fetchScanResult(jobId), 500);
+        }
+      } catch (err) {
+        console.error("Failed to parse SSE data", err);
+      }
+    };
+    eventSource.onerror = () => eventSource.close();
+    return () => eventSource.close();
+  }, [jobId, fetchScanResult]);
 
   return (
-    <Box>
-      <Grid container spacing={4}>
-        <Grid item xs={12}>
-          <Paper sx={{ p: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
-            <Box sx={{ flexGrow: 1 }}>
-              <TextField 
-                label="Assessment Scope" 
-                placeholder="e.g. projects/my-project"
-                variant="outlined" 
-                fullWidth 
-                value={scope}
-                onChange={(e) => setScope(e.target.value)}
-                disabled={loading}
-                size="small"
-              />
-            </Box>
-            <Box sx={{ minWidth: 120 }}>
-              <TextField
-                select
-                label="Regulation"
-                value={regulation}
-                onChange={(e) => setRegulation(e.target.value)}
-                disabled={loading}
-                size="small"
-                fullWidth
-                SelectProps={{ native: true }}
-              >
-                <option value="CRA">CRA</option>
-                <option value="DORA">DORA</option>
-              </TextField>
-            </Box>
-            <Button
-              variant="contained" 
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
-              onClick={handleScan}
-              disabled={loading}
-              sx={{ px: 4 }}
-            >
-              {loading ? 'Running...' : 'Run New Scan'}
-            </Button>
-          </Paper>
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+    <Grid container spacing={3}>
+      <Grid item xs={12}>
+        <ScanControls
+          scope={scope}
+          setScope={setScope}
+          regulation={regulation}
+          setRegulation={setRegulation}
+          loading={loading}
+          handleScan={handleScan}
+        />
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      </Grid>
+      <Grid item xs={12} md={5} lg={4}>
+        <AgentLog events={events} />
+      </Grid>
+      <Grid item xs={12} md={7} lg={8}>
+        <ScanResults scanResult={scanResult} loading={loading} jobId={jobId}/>
+      </Grid>
+    </Grid>
+  );
+}
+
+
+// --- Reusable Components ---
+function FilterControls({ findings, filters, setFilters }: any) {
+  const { orgs, folders, projects } = useMemo(() => {
+    const sets = {
+      orgs: new Set<string>(),
+      folders: new Set<string>(),
+      projects: new Set<string>(),
+    };
+    findings.forEach((f: any) => {
+      const { org, folder, proj } = extractHierarchy(f.resource_name);
+      if (org !== 'Unknown') sets.orgs.add(org);
+      if (folder !== 'Unknown') sets.folders.add(folder);
+      if (proj !== 'Unknown') sets.projects.add(proj);
+    });
+    return {
+      orgs: ['All', ...Array.from(sets.orgs)],
+      folders: ['All', ...Array.from(sets.folders)],
+      projects: ['All', ...Array.from(sets.projects)],
+    };
+  }, [findings]);
+  
+  const handleFilterChange = (event: SelectChangeEvent<string>) => {
+    setFilters((prev: any) => ({ ...prev, [event.target.name]: event.target.value }));
+  };
+
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Grid container spacing={2} alignItems="center">
+        <Grid item><Typography variant="subtitle1">Filters</Typography></Grid>
+        <Grid item xs>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Organization</InputLabel>
+            <Select name="org" value={filters.org} label="Organization" onChange={handleFilterChange}>
+              {orgs.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+            </Select>
+          </FormControl>
         </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ height: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#202124' }}>
-            <Box sx={{ backgroundColor: '#202124', p: 1.5, borderBottom: '1px solid #3c4043', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TerminalIcon sx={{ color: '#9aa0a6', fontSize: 18 }} />
-              <Typography variant="caption" sx={{ color: '#9aa0a6', fontFamily: 'monospace', fontWeight: 600 }}>
-                agent_execution.log
-              </Typography>
-            </Box>
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, fontFamily: 'monospace', fontSize: '0.85rem' }}>
-              {events.length === 0 && <Typography variant="caption" sx={{ color: '#5f6368' }}>$ Waiting for telemetry stream...</Typography>}
-              {events.slice().map((ev, i) => (
-                <Box key={i} sx={{ mb: 1 }}>
-                  <span style={{ color: '#5f6368' }}>[{new Date(ev.timestamp).toLocaleTimeString()}]</span>{' '}
-                  <span style={{ color: '#8ab4f8' }}>{ev.agent_name}</span>{' '}
-                  <span style={{ color: ev.status === 'started' ? '#fde293' : '#81c995' }}>{ev.status}</span>{' '}
-                  {ev.resource_name && <span style={{ color: '#9aa0a6' }}>({ev.resource_name.split('/').pop()})</span>}
-                </Box>
-              ))}
-              <div ref={logEndRef} />
-            </Box>
-          </Paper>
+        <Grid item xs>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Folder</InputLabel>
+            <Select name="folder" value={filters.folder} label="Folder" onChange={handleFilterChange}>
+              {folders.map(f => <MenuItem key={f} value={f}>{f}</MenuItem>)}
+            </Select>
+          </FormControl>
         </Grid>
-
-        <Grid item xs={12} md={8}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <Paper sx={{ p: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>Scan Progress</Typography>
-                  <Typography variant="h5" sx={{ mb: 1 }}>
-                    {scanResult ? (scanResult.status === 'completed' ? 'Finished' : 'Processing...') : (jobId ? 'In Progress' : 'Ready')}
-                  </Typography>
-                  {jobId && <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>ID: {jobId.slice(0, 8)}...</Typography>}
-                </Box>
-                {scanResult && scanResult.status === 'completed' && (
-                  <Box sx={{ width: 80, height: 80 }}>
-                    <Doughnut data={chartData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70' }} />
-                  </Box>
-                )}
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Paper sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>Quick Metrics</Typography>
-                <Stack direction="row" spacing={4} sx={{ mt: 1 }}>
-                  <Box>
-                    <Typography variant="h4" color="primary.main">{totalCount}</Typography>
-                    <Typography variant="caption" color="text.secondary">Total</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="h4" color="secondary.main">{compliantCount}</Typography>
-                    <Typography variant="caption" color="text.secondary">Pass</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="h4" color="error.main">{nonCompliantCount}</Typography>
-                    <Typography variant="caption" color="text.secondary">Fail</Typography>
-                  </Box>
-                </Stack>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Fade in={true}>
-                <Paper sx={{ overflow: 'hidden' }}>
-                  <Box sx={{ p: 2, borderBottom: '1px solid #dadce0', display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AssessmentIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-                    <Typography variant="subtitle1">Scan Details</Typography>
-                  </Box>
-                  <TableContainer sx={{ maxHeight: 330 }}>
-                    <Table stickyHeader size="medium">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Resource</TableCell>
-                          <TableCell align="center">Framework</TableCell>
-                          <TableCell align="center">Status</TableCell>
-                          <TableCell>Details</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {findings.length > 0 ? findings.map((f, idx) => (
-                          <TableRow key={idx} hover>
-                            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                              {f.resource_name.split('/').pop()}
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip label={f.regulation} size="small" variant="outlined" sx={{ fontWeight: 500 }} />
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip
-                                label={f.status}
-                                variant="outlined"
-                                size="small"
-                                color={isCompliant(f.status) ? 'success' : 'error'}
-                                sx={{ fontWeight: 600 }}
-                              />
-                            </TableCell>
-                            <TableCell sx={{ fontSize: '0.85rem' }}>{f.details}</TableCell>
-                          </TableRow>
-                        )) : (
-                          <TableRow>
-                              <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                              {loading ? 'Analyzing resources...' : 'No telemetry data received.'}
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Paper>
-              </Fade>
-            </Grid>
-          </Grid>
+        <Grid item xs>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Project</InputLabel>
+            <Select name="project" value={filters.project} label="Project" onChange={handleFilterChange}>
+              {projects.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Regulation</InputLabel>
+            <Select name="regulation" value={filters.regulation} label="Regulation" onChange={handleFilterChange}>
+              {['All', 'CRA', 'DORA'].map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+            </Select>
+          </FormControl>
         </Grid>
       </Grid>
-    </Box>
+    </Paper>
+  );
+}
+
+function ComplianceChart({ findings }: any) {
+  const theme = useTheme();
+  const { compliant, nonCompliant, other } = useMemo(() => {
+    let c = 0, nc = 0;
+    findings.forEach((f: any) => {
+      if (isCompliant(f.status)) c++;
+      else if (isNonCompliant(f.status)) nc++;
+    });
+    return { compliant: c, nonCompliant: nc, other: findings.length - c - nc };
+  }, [findings]);
+  
+  const chartData = {
+    labels: ['Conformant', 'Non-Conformant', 'Other'],
+    datasets: [{
+      data: [compliant, nonCompliant, other],
+      backgroundColor: [
+        theme.palette.success.light,
+        theme.palette.error.light,
+        theme.palette.divider,
+      ],
+      borderColor: [
+        theme.palette.success.main,
+        theme.palette.error.main,
+        theme.palette.text.secondary,
+      ],
+      borderWidth: 1,
+    }],
+  };
+
+  return (
+    <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Typography variant="h6" gutterBottom>Compliance Overview</Typography>
+      <Box sx={{ flexGrow: 1, width: '100%', minHeight: 200 }}>
+        <Doughnut data={chartData} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
+      </Box>
+      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+        <Chip icon={<CheckCircle />} label={`Pass: ${compliant}`} color="success" variant="outlined" />
+        <Chip icon={<ErrorIcon />} label={`Fail: ${nonCompliant}`} color="error" variant="outlined" />
+      </Stack>
+    </Paper>
+  );
+}
+
+
+function ActionToolbar({ findings }: { findings: any[] }) {
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert("URL copied to clipboard!");
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Resource', 'Regulation', 'Status', 'Details'];
+    const csvContent = [
+      headers.join(','),
+      ...findings.map((f: any) => `"${f.resource_name}","${f.regulation}","${f.status}","${f.details.replace(/"/g, '""')}"`)
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'findings.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <Paper sx={{ p: 2, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2 }}>
+      <Button startIcon={<Share />} onClick={handleShare} variant="outlined">Share</Button>
+      <Button startIcon={<Download />} onClick={handleExportCSV} variant="contained" color="primary">Export CSV</Button>
+    </Paper>
+  );
+}
+
+function FindingsTable({ findings }: { findings: any[] }) {
+  return (
+    <TableContainer component={Paper}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Resource</TableCell>
+            <TableCell>Regulation</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Details</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {findings.map((finding, idx) => (
+            <TableRow key={idx}>
+              <TableCell>{finding.resource_name}</TableCell>
+              <TableCell>{finding.regulation}</TableCell>
+              <TableCell>
+                <Chip
+                  label={finding.status}
+                  color={isCompliant(finding.status) ? "success" : isNonCompliant(finding.status) ? "error" : "default"}
+                  size="small"
+                  variant="outlined"
+                />
+              </TableCell>
+              <TableCell>{finding.details}</TableCell>
+            </TableRow>
+          ))}
+          {findings.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} align="center">No findings available.</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+function ScanControls({ scope, setScope, regulation, setRegulation, loading, handleScan }: any) {
+  return (
+    <Paper sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+      <TextField label="Scope" variant="outlined" size="small" value={scope} onChange={(e) => setScope(e.target.value)} fullWidth />
+      <FormControl size="small" sx={{ minWidth: 120 }}>
+        <InputLabel>Regulation</InputLabel>
+        <Select value={regulation} label="Regulation" onChange={(e) => setRegulation(e.target.value)}>
+          <MenuItem value="CRA">CRA</MenuItem>
+          <MenuItem value="DORA">DORA</MenuItem>
+        </Select>
+      </FormControl>
+      <Button variant="contained" color="primary" onClick={handleScan} disabled={loading} startIcon={loading ? <CircularProgress size={20} /> : <PlayArrow />}>
+        Scan
+      </Button>
+    </Paper>
+  );
+}
+
+function AgentLog({ events }: { events: any[] }) {
+  return (
+    <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h6" gutterBottom>Agent Log</Typography>
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', maxHeight: 400 }}>
+        {events.length === 0 ? (
+          <Typography variant="body2" color="textSecondary">No events yet.</Typography>
+        ) : (
+          events.map((e, idx) => (
+            <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Typography variant="caption" color="textSecondary">[{new Date(e.timestamp).toLocaleTimeString()}] {e.agent_name}</Typography>
+              <Typography variant="body2">{e.details}</Typography>
+            </Box>
+          ))
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+function ScanResults({ scanResult, loading, jobId }: any) {
+  if (loading) {
+    return (
+      <Paper sx={{ p: 2, height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Paper>
+    );
+  }
+
+  if (!scanResult) {
+    return (
+      <Paper sx={{ p: 2, height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Typography color="textSecondary">No scan results to display. Run a scan to begin.</Typography>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper sx={{ p: 2, height: '100%' }}>
+      <Typography variant="h6" gutterBottom>Scan Results {jobId && `(Job ID: ${jobId})`}</Typography>
+      <Typography variant="subtitle2" color="textSecondary" gutterBottom>Status: {scanResult.status}</Typography>
+      <FindingsTable findings={scanResult.findings || []} />
+    </Paper>
   );
 }

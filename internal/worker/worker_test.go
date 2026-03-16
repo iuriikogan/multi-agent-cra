@@ -25,7 +25,7 @@ func TestWorker_Routes(t *testing.T) {
 
 	// This is a smoke test to ensure the mux is correctly handled.
 	// We don't call RegisterRoutes here because it initializes real clients.
-	
+
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

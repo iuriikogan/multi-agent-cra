@@ -3,14 +3,12 @@ module github.com/iuriikogan/Audit-Agent
 go 1.25.0
 
 require (
-	cloud.google.com/go/ai v0.8.0
 	cloud.google.com/go/asset v1.22.0
 	cloud.google.com/go/pubsub/v2 v2.4.0
 	cloud.google.com/go/storage v1.56.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.31.0
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 	go.opentelemetry.io/otel v1.41.0
@@ -18,6 +16,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.41.0
 	golang.org/x/sync v0.19.0
 	google.golang.org/api v0.259.0
+	google.golang.org/genai v1.50.0
 	modernc.org/sqlite v1.46.1
 )
 
@@ -51,6 +50,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.12 // indirect
 	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect

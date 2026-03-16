@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/genai"
 )
 
 func TestToolDefinitions(t *testing.T) {
@@ -66,7 +66,6 @@ func TestDefaultExecutor_Execute(t *testing.T) {
 			args:     map[string]interface{}{"query": "reporting obligations"},
 			contains: "Error searching knowledge base: genai client is nil",
 		},
-
 
 		{
 			name:     "ingest_file_system",

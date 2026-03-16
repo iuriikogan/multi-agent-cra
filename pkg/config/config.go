@@ -91,12 +91,12 @@ func Load() *Config {
 		},
 		Models: ModelsConfig{
 			Aggregator:     getEnv("MODEL_AGGREGATOR", "gemini-3.1-flash-lite-preview"),
-			Modeler:        getEnv("MODEL_MODELER", "gemini-3-pro-preview"),
-			Validator:      getEnv("MODEL_VALIDATOR", "gemini-3-pro-preview"),
-			Reviewer:       getEnv("MODEL_REVIEWER", "gemini-3-pro-preview"),
+			Modeler:        getEnv("MODEL_MODELER", "gemini-3.1-flash-lite-preview"),
+			Validator:      getEnv("MODEL_VALIDATOR", "gemini-3.1-flash-lite-preview"),
+			Reviewer:       getEnv("MODEL_REVIEWER", "gemini-3.1-flash-lite-preview"),
 			Tagger:         getEnv("MODEL_TAGGER", "gemini-3.1-flash-lite-preview"),
 			Reporter:       getEnv("MODEL_REPORTER", "gemini-3.1-flash-lite-preview"),
-			VisualReporter: getEnv("MODEL_REPORTER", "gemini-3-pro-preview"),
+			VisualReporter: getEnv("MODEL_REPORTER", "gemini-3.1-flash-lite-preview"),
 		},
 	}
 }

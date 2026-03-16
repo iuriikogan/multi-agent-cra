@@ -18,10 +18,10 @@ import (
 
 // AgentTask holds the data transferred between assessment agents in the pipeline.
 type AgentTask struct {
-	JobID    string                `json:"job_id"`   // Unique ID for the scan job
-	Scope    string                `json:"scope"`    // Resource scope being assessed
-	Resource core.GCPResource      `json:"resource"` // Target resource details
-	Result     core.AssessmentResult `json:"result"`   // Cumulative results from agents
+	JobID      string                `json:"job_id"`     // Unique ID for the scan job
+	Scope      string                `json:"scope"`      // Resource scope being assessed
+	Resource   core.GCPResource      `json:"resource"`   // Target resource details
+	Result     core.AssessmentResult `json:"result"`     // Cumulative results from agents
 	Regulation string                `json:"regulation"` // CRA or DORA
 }
 

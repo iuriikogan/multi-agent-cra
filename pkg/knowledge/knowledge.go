@@ -1,4 +1,4 @@
-// Package knowledge provides vector search capabilities over the embedded CRA knowledge base.
+// Package knowledge provides vector search capabilities over the embedded CRA/DORA Knowledge base
 package knowledge
 
 import (
@@ -9,7 +9,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/genai"
 )
 
 //go:embed cra_kb.json dora_kb.json
@@ -69,13 +69,12 @@ func Search(ctx context.Context, client *genai.Client, query string, reg Regulat
 		return nil, fmt.Errorf("genai client is nil")
 	}
 
-	model := client.EmbeddingModel("gemini-embedding-001")
-	res, err := model.EmbedContent(ctx, genai.Text(query))
+	res, err := client.Models.EmbedContent(ctx, "text-embedding-004", genai.Text(query), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to embed query: %w", err)
 	}
 
-	queryEmb := res.Embedding.Values
+	queryEmb := res.Embeddings[0].Values
 	results := make([]Chunk, len(kb))
 	copy(results, kb)
 

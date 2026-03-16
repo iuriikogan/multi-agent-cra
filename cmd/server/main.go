@@ -21,7 +21,7 @@ import (
 	"github.com/iuriikogan/Audit-Agent/pkg/store"
 )
 
-//go:embed out
+//go:embed all:out
 var staticAssets embed.FS
 
 func main() {

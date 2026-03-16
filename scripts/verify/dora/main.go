@@ -6,9 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/iuriikogan/Audit-Agent/pkg/knowledge"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 func main() {
@@ -18,11 +17,10 @@ func main() {
 		log.Fatal("GEMINI_API_KEY not set")
 	}
 
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
 	if err != nil {
 		log.Fatalf("failed to create client: %v", err)
 	}
-	defer client.Close()
 
 	if err := knowledge.Init(); err != nil {
 		log.Fatalf("knowledge.Init failed: %v", err)

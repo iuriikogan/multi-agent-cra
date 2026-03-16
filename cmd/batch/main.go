@@ -11,8 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 
 	"github.com/iuriikogan/Audit-Agent/internal/batch"
 	"github.com/iuriikogan/Audit-Agent/pkg/config"
@@ -67,16 +66,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
 	if err != nil {
 		slog.Error("Failed to create GenAI client", "error", err)
 		os.Exit(1)
 	}
-	defer func() {
-		if err := client.Close(); err != nil {
-			slog.Error("Failed to close GenAI client", "error", err)
-		}
-	}()
 
 	if *mode == "server" {
 		slog.Warn("Running in SERVER mode is deprecated for batch. Use cmd/server instead.")

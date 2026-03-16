@@ -8,8 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 type Chunk struct {
@@ -24,11 +23,10 @@ func main() {
 	}
 
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
 	if err != nil {
 		log.Fatalf("Failed to create genai client: %v", err)
 	}
-	defer client.Close()
 
 	content, err := os.ReadFile("dora_text.txt")
 	if err != nil {
@@ -55,18 +53,17 @@ func main() {
 
 	fmt.Printf("Generating embeddings for %d chunks...\n", len(chunks))
 
-	model := client.EmbeddingModel("gemini-embedding-001")
 	var knowledgeBase []Chunk
 
 	for i, c := range chunks {
 		fmt.Printf("Embedding chunk %d/%d...\n", i+1, len(chunks))
-		res, err := model.EmbedContent(ctx, genai.Text(c))
+		res, err := client.Models.EmbedContent(ctx, "text-embedding-004", genai.Text(c), nil)
 		if err != nil {
 			log.Fatalf("Failed to embed chunk %d: %v", i, err)
 		}
 		knowledgeBase = append(knowledgeBase, Chunk{
 			Text:      c,
-			Embedding: res.Embedding.Values,
+			Embedding: res.Embeddings[0].Values,
 		})
 	}
 

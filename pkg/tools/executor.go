@@ -11,9 +11,9 @@ import (
 
 	asset "cloud.google.com/go/asset/apiv1"
 	"cloud.google.com/go/asset/apiv1/assetpb"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/iuriikogan/Audit-Agent/pkg/knowledge"
 	"google.golang.org/api/iterator"
+	"google.golang.org/genai"
 )
 
 // Executor defines the interface for running tool logic and returning results as strings.
@@ -66,7 +66,7 @@ func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[str
 			return fmt.Sprintf("Error searching knowledge base: %v", err), nil
 		}
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Relevant %s Information:\n", reg))
+		fmt.Fprintf(&sb, "Relevant %s Information:\n", reg)
 		for _, c := range chunks {
 			fmt.Fprintf(&sb, "- %s (Relevance: %.2f)\n", c.Text, c.Score)
 		}
@@ -162,24 +162,18 @@ func (e *DefaultExecutor) generateVisualDashboard(ctx context.Context, args map[
 		return "Error: prompt and filename are required.", nil
 	}
 
-	imgModel := e.Client.GenerativeModel("gemini-3-pro-image-preview")
-	resp, err := imgModel.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := e.Client.Models.GenerateImages(ctx, "gemini-2.5-flash-image", prompt, nil)
 	if err != nil {
 		return fmt.Sprintf("Error generating image: %v", err), nil
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	if len(resp.GeneratedImages) == 0 || resp.GeneratedImages[0].Image == nil || len(resp.GeneratedImages[0].Image.ImageBytes) == 0 {
 		return "Error: No image generated.", nil
 	}
 
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if blob, ok := part.(genai.Blob); ok {
-			safeFilename := filepath.Base(filename)
-			if err := os.WriteFile(safeFilename, blob.Data, 0644); err != nil {
-				return fmt.Sprintf("Error saving image to file: %v", err), nil
-			}
-			return fmt.Sprintf("Successfully generated visual dashboard and saved to %s", safeFilename), nil
-		}
+	safeFilename := filepath.Base(filename)
+	if err := os.WriteFile(safeFilename, resp.GeneratedImages[0].Image.ImageBytes, 0644); err != nil {
+		return fmt.Sprintf("Error saving image to file: %v", err), nil
 	}
-	return "Error: No recognized image data found in response.", nil
+	return fmt.Sprintf("Successfully generated visual dashboard and saved to %s", safeFilename), nil
 }
