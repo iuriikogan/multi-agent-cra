@@ -6,8 +6,8 @@ on:
     branches: main
 
 env: 
-  IMAGE_NAME: ${{ env.IMAGE_NAME }}
-  IMAGE_TAG: ${{ env.IMAGE_TAG }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+  IMAGE_TAG: ${{ vars.IMAGE_TAG }}
   PLATFORM: linux/amd64
   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }} 
   SNYK_ORG_ID: ${{ secrets.SNYK_ORG_ID }}
