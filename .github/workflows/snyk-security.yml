@@ -20,13 +20,16 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-      - name: Use Node.js 20.x
-        uses: actions/setup-node@v2
+        
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v3
         with:
           node-version: 22
-      
+          always-auth: true
+          
       - name: Build project
-        run: npm install --legacy-peer-deps
+        run: |
+          npm login && npm install --legacy-peer-deps
   
       - name: Setup Snyk + snyk-filter # For information about the required commands https://docs.snyk.io/scm-ide-and-ci-cd-integrations/snyk-ci-cd-integrations
         run: |
