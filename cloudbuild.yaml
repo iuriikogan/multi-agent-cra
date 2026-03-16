@@ -132,9 +132,7 @@ substitutions:
   _TAG: latest
   _DB_IP: 10.0.0.3
 
-images:
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/server:${_TAG}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/worker:${_TAG}'
 
 options:
+
   logging: CLOUD_LOGGING_ONLY
