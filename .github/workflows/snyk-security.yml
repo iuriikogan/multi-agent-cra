@@ -26,7 +26,7 @@ jobs:
           node-version: 22
       
       - name: Build project
-        run: npm ci
+        run: npm install --legacy-peer-deps
   
       - name: Setup Snyk + snyk-filter # For information about the required commands https://docs.snyk.io/scm-ide-and-ci-cd-integrations/snyk-ci-cd-integrations
         run: |
