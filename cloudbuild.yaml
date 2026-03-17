@@ -34,7 +34,7 @@ steps:
       - '--region'
       - '${_REGION}'
       - '--ingress'
-      - 'all'
+      - 'internal-and-cloud-load-balancing'
       - '--service-account'
       - 'compliance-server-sa@${PROJECT_ID}.iam.gserviceaccount.com'
       - '--vpc-connector'
