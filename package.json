@@ -1,4 +1,9 @@
 {
+  "name": "audit-agent",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'No root build needed' && cd web && npm install && npm run build"
+  },
   "dependencies": {
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
