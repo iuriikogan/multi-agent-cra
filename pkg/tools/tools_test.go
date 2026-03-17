@@ -61,8 +61,8 @@ func TestDefaultExecutor_Execute(t *testing.T) {
 			want:     "Technical specs for 123: Processor X1, 8GB RAM, Secure Boot enabled.",
 		},
 		{
-			name:     "search_cra_knowledge",
-			toolName: "search_cra_knowledge",
+			name:     "search_knowledge_base",
+			toolName: "search_knowledge_base",
 			args:     map[string]interface{}{"query": "reporting obligations"},
 			contains: "Error searching knowledge base: genai client is nil",
 		},

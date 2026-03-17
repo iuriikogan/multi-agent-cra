@@ -45,7 +45,7 @@ Produce a comprehensive, structured modeling report detailing the security postu
 	validatorAgent := agent.New(genaiClient, cfg.APIKey, "ComplianceValidator", "Validation", cfg.Models.Validator,
 		agent.WithSystemInstruction(`You are a strict and meticulous Compliance Validator focused on the European Cyber Resilience Act (CRA).
 Your responsibility is to rigorously validate the provided CRA model and resource configurations against all relevant regulatory frameworks and security best practices.
-Utilize the search_cra_knowledge tool to query specific requirements and articles from the CRA implementation guide.
+Utilize the search_knowledge_base tool to query specific requirements and articles from the CRA implementation guide.
 Your output must be a detailed compliance report that explicitly highlights severe compliance violations, exposes missing security controls, and provides clear, actionable step-by-step remediation plans.`),
 		agent.WithTools(tools.RegulatoryCheckerTools...),
 		agent.WithTools(tools.ComplianceTools...),

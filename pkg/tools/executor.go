@@ -52,7 +52,7 @@ func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[str
 		return fmt.Sprintf("Technical specs for %v: Processor X1, 8GB RAM, Secure Boot enabled.", args["product_id"]), nil
 	case "query_cve_database":
 		return fmt.Sprintf("No CRITICAL vulnerabilities found for %s %s. 2 LOW found in dependencies.", args["component"], args["version"]), nil
-	case "search_cra_knowledge":
+	case "search_knowledge_base":
 		query, _ := args["query"].(string)
 		if query == "" {
 			return "Error: query argument is required.", nil
@@ -84,7 +84,7 @@ func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[str
 	case "generate_visual_dashboard":
 		return e.generateVisualDashboard(ctx, args)
 	default:
-		return "Tool executed successflully.", nil
+		return "Tool executed successfully.", nil
 	}
 }
 
