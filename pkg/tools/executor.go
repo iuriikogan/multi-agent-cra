@@ -84,7 +84,7 @@ func (e *DefaultExecutor) Execute(ctx context.Context, name string, args map[str
 	case "generate_visual_dashboard":
 		return e.generateVisualDashboard(ctx, args)
 	default:
-		return "Tool executed successfully.", nil
+		return "Tool executed successflully.", nil
 	}
 }
 
