@@ -131,6 +131,7 @@ func NewAppHandler(ctx context.Context, cfg *config.Config, pubsubClient *queue.
 
 	// Retrieve all historical findings.
 	apiMux.HandleFunc("/api/findings", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -249,6 +250,7 @@ func handleScanCreate(w http.ResponseWriter, r *http.Request, pubsubClient *queu
 
 // handleGetScan retrieves the current status and findings for a specific job ID.
 func handleGetScan(w http.ResponseWriter, r *http.Request, db store.Store) {
+	w.Header().Set("Cache-Control", "no-cache")
 	jobID := r.URL.Query().Get("id")
 	if jobID == "" {
 		http.Error(w, "Missing required 'id' parameter", http.StatusBadRequest)

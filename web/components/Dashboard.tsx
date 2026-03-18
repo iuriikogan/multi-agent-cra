@@ -141,7 +141,9 @@ function ComplianceOverview() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/findings');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/findings`, {
+        cache: 'no-store'
+      });
       if (!res.ok) {
         throw new Error(`Failed to fetch findings. Status: ${res.status}`);
       }
@@ -287,7 +289,7 @@ function LiveScan() {
     setEvents([]);
 
     try {
-      const res = await fetch('/api/scan', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scope, regulation }),
@@ -303,7 +305,9 @@ function LiveScan() {
   
   const fetchScanResult = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/scan?id=${id}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/scan?id=${id}`, {
+        cache: 'no-store'
+      });
       if (!res.ok) {
         throw new Error(`Failed to fetch scan results: ${res.statusText}`);
       }
@@ -331,7 +335,7 @@ function LiveScan() {
     let reconnectTimeout: NodeJS.Timeout;
     
     const connectSSE = () => {
-      const eventSource = new EventSource('/api/stream');
+      const eventSource = new EventSource(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/stream`);
       
       eventSource.onmessage = (event) => {
         try {
