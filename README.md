@@ -80,9 +80,4 @@ Ensure the following prerequisites are met:
 For instructions on deployment, refer to [DEPLOY.md](./DEPLOY.md).
 *   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com, sqladmin.googleapis.com, cloudtrace.googleapis.com.
 
-<<<<<<< iuriikogan-patch-9
-###     [Deployment Instructions](https://github.com/iuriikogan/Audit-Agent/blob/4a9019444fd98bd3ab19e56cfd8c69c80bbe32a2/DEPLOY.md)
-=======
->>>>>>> main
-
 ### [   Architecture](https://github.com/iuriikogan/Audit-Agent/blob/main/ARCHITECTURE.md)
