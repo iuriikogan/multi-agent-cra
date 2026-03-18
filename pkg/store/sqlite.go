@@ -36,6 +36,12 @@ func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 	}
 
+	// For in-memory databases, we must limit the pool to a single connection
+	// to ensure all goroutines see the same database.
+	if strings.Contains(dsn, ":memory:") || strings.Contains(dsn, "mode=memory") {
+		db.SetMaxOpenConns(1)
+	}
+
 	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping sqlite database: %w", err)
 	}
@@ -48,7 +54,11 @@ func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 			regulation TEXT NOT NULL DEFAULT 'CRA',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			completed_at DATETIME
-		);
+		);`); err != nil {
+		return nil, fmt.Errorf("failed to initialize scans table: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS findings (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			job_id TEXT REFERENCES scans(job_id),
@@ -58,7 +68,7 @@ func NewSQLite(ctx context.Context, dsn string) (Store, error) {
 			regulation TEXT NOT NULL DEFAULT 'CRA'
 		);
 	`); err != nil {
-		return nil, fmt.Errorf("failed to initialize sqlite schema: %w", err)
+		return nil, fmt.Errorf("failed to initialize findings table: %w", err)
 	}
 
 	return &SQLiteStore{db: db}, nil
@@ -96,6 +106,7 @@ func (s *SQLiteStore) AddFinding(ctx context.Context, jobID string, f Finding) e
 func (s *SQLiteStore) GetScan(ctx context.Context, jobID string) (*ScanResult, error) {
 	row := s.db.QueryRowContext(ctx, "SELECT job_id, scope, status, regulation, created_at, completed_at FROM scans WHERE job_id = ?", jobID)
 	var res ScanResult
+	res.Findings = make([]Finding, 0)
 	if err := row.Scan(&res.JobID, &res.Scope, &res.Status, &res.Regulation, &res.CreatedAt, &res.CompletedAt); err != nil {
 		return nil, err
 	}
@@ -131,7 +142,7 @@ func (s *SQLiteStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
 		_ = rows.Close()
 	}()
 
-	var findings []Finding
+	findings := make([]Finding, 0)
 	for rows.Next() {
 		var f Finding
 		var detailsStr string

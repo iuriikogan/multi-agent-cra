@@ -102,6 +102,8 @@ The output should be a JSON object with the following fields: 'resource_name', '
 			return
 		}
 
+		defer r.Body.Close() // Essential for preventing Netty ByteBuf leaks in Pub/Sub Emulator
+
 		var req workflow.PushMessage
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)

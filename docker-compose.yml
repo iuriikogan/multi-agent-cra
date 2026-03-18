@@ -18,6 +18,9 @@ services:
       - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
       - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
       - DATABASE_TYPE=SQLITE_MEM
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/application_default_credentials.json
+    volumes:
+      - /home/ikogan/.config/gcloud/application_default_credentials.json:/tmp/keys/application_default_credentials.json:ro
     depends_on:
       pubsub:
         condition: service_healthy
@@ -25,28 +28,30 @@ services:
         condition: service_completed_successfully
 
   # --- Worker Service ---
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        TARGET: worker
-    # In local dev, we run the worker binary directly (or via container entrypoint)
-    environment:
-      - PROJECT_ID=${PROJECT_ID}
-      - REGION=${REGION}
-      - LOG_LEVEL=DEBUG
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PUBSUB_EMULATOR_HOST=pubsub:8085
-      - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
-      - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
-      - DATABASE_TYPE=SQLITE_MEM
-      - PORT=8080 # For health checks
-    depends_on:
-      pubsub:
-        condition: service_healthy
-      setup-pubsub:
-        condition: service_completed_successfully
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     args:
+  #       TARGET: worker
+  #   environment:
+  #     - PROJECT_ID=${PROJECT_ID}
+  #     - REGION=${REGION}
+  #     - LOG_LEVEL=DEBUG
+  #     - GEMINI_API_KEY=${GEMINI_API_KEY}
+  #     - PUBSUB_EMULATOR_HOST=pubsub:8085
+  #     - PUBSUB_TOPIC_SCAN_REQUESTS=scan-requests
+  #     - PUBSUB_SUB_SCAN_REQUESTS=scan-requests-sub
+  #     - DATABASE_TYPE=SQLITE_MEM
+  #     - PORT=8080 # For health checks
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/application_default_credentials.json
+  #   volumes:
+  #     - /home/ikogan/.config/gcloud/application_default_credentials.json:/tmp/keys/application_default_credentials.json:ro
+  #   depends_on:
+  #     pubsub:
+  #       condition: service_healthy
+  #     setup-pubsub:
+  #       condition: service_completed_successfully
 
   # --- Infrastructure Emulators ---
 
@@ -71,19 +76,19 @@ services:
       until curl -s http://$$PUBSUB_EMULATOR_HOST; do sleep 2; done &&
       echo 'Creating topics and subscriptions...' &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/scan-requests || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/scan-requests-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/scan-requests\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/scan-requests\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/scan-requests-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/scan-requests\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/scan-requests\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/aggregator-tasks || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/aggregator-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/aggregator-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/aggregator\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/aggregator-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/aggregator-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/aggregator\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/modeler-tasks || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/modeler-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/modeler-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/modeler\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/modeler-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/modeler-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/modeler\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/validator-tasks || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/validator-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/validator-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/validator\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/validator-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/validator-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/validator\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/reviewer-tasks || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/reviewer-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/reviewer-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/reviewer\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/reviewer-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/reviewer-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/reviewer\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/tagger-tasks || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/tagger-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/tagger-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/tagger\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/tagger-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/tagger-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/tagger\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/reporter-tasks || true &&
-      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/reporter-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/reporter-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://worker:8080/pubsub/reporter\\\"}}\" || true &&
+      curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/reporter-tasks-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/reporter-tasks\\\", \\\"pushConfig\\\": {\\\"pushEndpoint\\\": \\\"http://server:8080/pubsub/reporter\\\"}}\" || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/topics/monitoring-events || true &&
       curl -s -X PUT http://$$PUBSUB_EMULATOR_HOST/v1/projects/$${PROJECT_ID}/subscriptions/monitoring-events-sub -H 'Content-Type: application/json' -d \"{\\\"topic\\\": \\\"projects/$${PROJECT_ID}/topics/monitoring-events\\\"}\" || true &&
       echo 'Pub/Sub resources created.'"

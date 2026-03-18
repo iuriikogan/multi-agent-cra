@@ -31,6 +31,9 @@ import {
   Tab,
   useTheme,
   useMediaQuery,
+  Card,
+  CardContent,
+  Divider,
 } from '@mui/material';
 import {
   Share,
@@ -111,8 +114,12 @@ export default function Dashboard() {
         </Tabs>
       </AppBar>
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        {currentTab === 0 && <ComplianceOverview />}
-        {currentTab === 1 && <LiveScan />}
+        <Box sx={{ display: currentTab === 0 ? 'block' : 'none' }}>
+          <ComplianceOverview />
+        </Box>
+        <Box sx={{ display: currentTab === 1 ? 'block' : 'none' }}>
+          <LiveScan />
+        </Box>
       </Container>
     </Box>
   );
@@ -122,6 +129,7 @@ export default function Dashboard() {
 function ComplianceOverview() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     org: 'All',
     folder: 'All',
@@ -132,12 +140,26 @@ function ComplianceOverview() {
   const fetchFindings = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await fetch('/api/findings');
-      if (res.ok) {
-        setFindings(await res.json() || []);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch findings. Status: ${res.status}`);
       }
-    } catch (err) {
+      const data = await res.json();
+      
+      // Data Validation: Ensure we always have an array
+      if (Array.isArray(data)) {
+        setFindings(data);
+      } else if (data && Array.isArray(data.findings)) {
+        setFindings(data.findings);
+      } else {
+        console.warn('Unexpected data format for findings:', data);
+        setFindings([]);
+      }
+    } catch (err: any) {
       console.error("Failed to fetch findings", err);
+      setError(err.message || 'An unexpected error occurred while loading findings.');
+      setFindings([]);
     } finally {
       setLoading(false);
     }
@@ -148,7 +170,12 @@ function ComplianceOverview() {
   }, [fetchFindings]);
 
   const filteredFindings = useMemo(() => {
+    if (!Array.isArray(findings)) return [];
+    
     return findings.filter(f => {
+      // Safe guard against malformed data
+      if (!f || !f.resource_name) return false;
+      
       const { org, folder, proj } = extractHierarchy(f.resource_name);
       if (filters.org !== 'All' && org !== filters.org) return false;
       if (filters.folder !== 'All' && folder !== filters.folder) return false;
@@ -163,6 +190,18 @@ function ComplianceOverview() {
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
         <CircularProgress />
       </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" action={
+        <Button color="inherit" size="small" onClick={fetchFindings}>
+          Retry
+        </Button>
+      }>
+        {error}
+      </Alert>
     );
   }
 
@@ -193,6 +232,52 @@ function LiveScan() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<MonitoringEvent[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const savedScope = localStorage.getItem('audit_scan_scope');
+      if (savedScope) setScope(savedScope);
+      const savedRegulation = localStorage.getItem('audit_scan_regulation');
+      if (savedRegulation) setRegulation(savedRegulation);
+      const savedJobId = localStorage.getItem('audit_scan_jobId');
+      if (savedJobId) setJobId(savedJobId);
+      const savedEvents = localStorage.getItem('audit_scan_events');
+      if (savedEvents) setEvents(JSON.parse(savedEvents));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('audit_scan_scope', scope);
+    }
+  }, [scope, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('audit_scan_regulation', regulation);
+    }
+  }, [regulation, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      if (jobId) localStorage.setItem('audit_scan_jobId', jobId);
+      else localStorage.removeItem('audit_scan_jobId');
+    }
+  }, [jobId, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('audit_scan_events', JSON.stringify(events));
+    }
+  }, [events, mounted]);
+
+  useEffect(() => {
+    if (mounted && jobId && !scanResult && !loading) {
+      fetchScanResult(jobId);
+    }
+  }, [mounted, jobId]); // Run once after mount
 
   const handleScan = async () => {
     setLoading(true);
@@ -219,35 +304,77 @@ function LiveScan() {
   const fetchScanResult = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/scan?id=${id}`);
-      if (res.ok) {
-        const data: ScanResult = await res.json();
-        setScanResult(data);
-        if (['completed', 'failed'].includes(data.status)) {
-          setLoading(false);
-        }
+      if (!res.ok) {
+        throw new Error(`Failed to fetch scan results: ${res.statusText}`);
       }
-    } catch (err) {
+      
+      const data: ScanResult = await res.json();
+      
+      // Data validation: Force findings to be an array if it isn't
+      if (data && !Array.isArray(data.findings)) {
+         console.warn("API returned invalid findings structure. Formatting as array:", data.findings);
+         data.findings = []; 
+      }
+      
+      setScanResult(data);
+      if (['completed', 'failed'].includes(data.status)) {
+        setLoading(false);
+      }
+    } catch (err: any) {
       console.error("Error fetching scan result", err);
+      setError(err.message || 'An error occurred fetching the final scan results.');
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/stream');
-    eventSource.onmessage = (event) => {
-      try {
-        const data: MonitoringEvent = JSON.parse(event.data);
-        setEvents((prev) => [data, ...prev].slice(0, 100)); 
+    let reconnectTimeout: NodeJS.Timeout;
+    
+    const connectSSE = () => {
+      const eventSource = new EventSource('/api/stream');
+      
+      eventSource.onmessage = (event) => {
+        try {
+          // Data Binding & Real-time Update validation
+          const data: MonitoringEvent = JSON.parse(event.data);
+          
+          if (!data || typeof data !== 'object') return;
+          
+          setEvents((prev) => [data, ...prev].slice(0, 100)); 
 
-        if (jobId && data.job_id === jobId && data.status === 'completed' && data.agent_name === 'Reporter') {
-           setTimeout(() => fetchScanResult(jobId), 500);
+          // Wait until the Reporter claims the job is fully completed before attempting to pull it
+          if (jobId && data.job_id === jobId && data.status === 'completed' && data.agent_name === 'Reporter') {
+             setTimeout(() => fetchScanResult(jobId), 1000);
+          }
+          
+          // Fallback mechanism: If overall status is failed
+          if (jobId && data.job_id === jobId && data.status === 'failed') {
+             setTimeout(() => fetchScanResult(jobId), 1000);
+          }
+        } catch (err) {
+          console.error("Failed to parse SSE data", err);
         }
-      } catch (err) {
-        console.error("Failed to parse SSE data", err);
-      }
+      };
+      
+      eventSource.onerror = () => {
+        eventSource.close();
+        // SSE error handling/reconnection logic
+        reconnectTimeout = setTimeout(connectSSE, 3000);
+      };
+      
+      return eventSource;
     };
-    eventSource.onerror = () => eventSource.close();
-    return () => eventSource.close();
+    
+    const es = connectSSE();
+    return () => {
+      es.close();
+      clearTimeout(reconnectTimeout);
+    };
   }, [jobId, fetchScanResult]);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <Grid container spacing={3}>
@@ -260,7 +387,7 @@ function LiveScan() {
           loading={loading}
           handleScan={handleScan}
         />
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       </Grid>
       <Grid item xs={12} md={5} lg={4}>
         <AgentLog events={events} />
@@ -414,41 +541,66 @@ function ActionToolbar({ findings }: { findings: any[] }) {
 }
 
 function FindingsTable({ findings }: { findings: any[] }) {
+  const safeFindings = Array.isArray(findings) ? findings : [];
+
+  if (safeFindings.length === 0) {
+    return (
+      <Paper sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="body2" color="textSecondary">
+          No findings available.
+        </Typography>
+      </Paper>
+    );
+  }
+
   return (
-    <TableContainer component={Paper}>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Resource</TableCell>
-            <TableCell>Regulation</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Details</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {findings.map((finding, idx) => (
-            <TableRow key={idx}>
-              <TableCell>{finding.resource_name}</TableCell>
-              <TableCell>{finding.regulation}</TableCell>
-              <TableCell>
+    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {safeFindings.map((finding, idx) => {
+        const status = finding?.status || 'Unknown';
+        const statusColor = isCompliant(status) ? "success" : isNonCompliant(status) ? "error" : "default";
+
+        return (
+          <Card key={idx} variant="outlined" sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {finding?.resource_name || 'N/A'}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Regulation: {finding?.regulation || 'N/A'}
+                  </Typography>
+                </Box>
                 <Chip
-                  label={finding.status}
-                  color={isCompliant(finding.status) ? "success" : isNonCompliant(finding.status) ? "error" : "default"}
+                  label={status}
+                  color={statusColor}
                   size="small"
                   variant="outlined"
+                  sx={{ fontWeight: 'bold' }}
                 />
-              </TableCell>
-              <TableCell>{finding.details}</TableCell>
-            </TableRow>
-          ))}
-          {findings.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={4} align="center">No findings available.</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+              </Box>
+              <Divider sx={{ my: 1 }} />
+              <Typography 
+                variant="body2" 
+                color="textPrimary" 
+                sx={{ 
+                  whiteSpace: 'pre-wrap', 
+                  wordBreak: 'break-word',
+                  fontFamily: 'monospace',
+                  backgroundColor: 'grey.50',
+                  p: 1.5,
+                  borderRadius: 1,
+                  maxHeight: '300px',
+                  overflowY: 'auto'
+                }}
+              >
+                {finding?.details || 'No details provided.'}
+              </Typography>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </Box>
   );
 }
 
@@ -480,8 +632,12 @@ function AgentLog({ events }: { events: any[] }) {
         ) : (
           events.map((e, idx) => (
             <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-              <Typography variant="caption" color="textSecondary">[{new Date(e.timestamp).toLocaleTimeString()}] {e.agent_name}</Typography>
-              <Typography variant="body2">{e.details}</Typography>
+              <Typography variant="caption" color="textSecondary">
+                [{new Date(e.timestamp).toLocaleTimeString()}] {e.agent_name}
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', mt: 0.5 }}>
+                {e.details}
+              </Typography>
             </Box>
           ))
         )}

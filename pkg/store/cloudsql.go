@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	// Register the MySQL driver for CloudSQL connections
@@ -20,10 +21,24 @@ type CloudSQLStore struct {
 // NewCloudSQL initializes a new CloudSQLStore with the provided DSN.
 // It returns a Store implementation and an error if initialization fails.
 func NewCloudSQL(ctx context.Context, dsn string) (Store, error) {
+	// The MySQL driver requires parseTime=true to scan DATETIME into time.Time
+	if !strings.Contains(dsn, "parseTime=true") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&parseTime=true"
+		} else {
+			dsn += "?parseTime=true"
+		}
+	}
+
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+
+	// Recommended connection pool settings for Cloud SQL
+	db.SetMaxOpenConns(50)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(30 * time.Minute)
 
 	pingCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -95,6 +110,7 @@ func (s *CloudSQLStore) AddFinding(ctx context.Context, jobID string, f Finding)
 func (s *CloudSQLStore) GetScan(ctx context.Context, jobID string) (*ScanResult, error) {
 	row := s.db.QueryRowContext(ctx, "SELECT job_id, scope, status, regulation, created_at, completed_at FROM scans WHERE job_id = ?", jobID)
 	var res ScanResult
+	res.Findings = make([]Finding, 0)
 	if err := row.Scan(&res.JobID, &res.Scope, &res.Status, &res.Regulation, &res.CreatedAt, &res.CompletedAt); err != nil {
 		return nil, err
 	}
@@ -130,7 +146,7 @@ func (s *CloudSQLStore) GetAllFindings(ctx context.Context) ([]Finding, error) {
 		_ = rows.Close()
 	}()
 
-	var findings []Finding
+	findings := make([]Finding, 0)
 	for rows.Next() {
 		var f Finding
 		var detailsRaw []byte

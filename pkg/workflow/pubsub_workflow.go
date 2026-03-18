@@ -46,12 +46,14 @@ type PushMessage struct {
 
 // RegisterPushHandler creates and registers an HTTP handler for an agent stage in the pipeline.
 // It takes a mux, route pattern, next topic for chaining, the agent instance, and a processor function.
-func (w *PubSubWorkflow) RegisterPushHandler(mux *http.ServeMux, pattern string, nextTopic string, a agent.Agent, processor func(ctx context.Context, a agent.Agent, task *AgentTask) error) {
+func (w *PubSubWorkflow) RegisterPushHandler(mux *http.ServeMux, pattern string, nextTopic string, a agent.Agent, processor func(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error)) {
 	mux.HandleFunc(pattern, func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(rw, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+
+		defer r.Body.Close() // Explicitly close to prevent memory leaks in the Pub/Sub emulator
 
 		var req PushMessage
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -70,16 +72,33 @@ func (w *PubSubWorkflow) RegisterPushHandler(mux *http.ServeMux, pattern string,
 		ctx := r.Context()
 		slog.Info("Agent processing push stage", "agent", a.Name(), "job_id", task.JobID, "resource", task.Resource.Name)
 
-		w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "started", "")
+		w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "started", "Request initiated")
 
-		if err := processor(ctx, a, &task); err != nil {
+		truncate := func(s string, max int) string {
+			// Replace newlines and tabs with spaces to keep it single-line and minified
+			s = strings.ReplaceAll(s, "\n", " ")
+			s = strings.ReplaceAll(s, "\t", " ")
+			if len(s) > max {
+				return s[:max-3] + "..."
+			}
+			return s
+		}
+
+		reqStr, resStr, err := processor(ctx, a, &task)
+		
+		reqShort := truncate(reqStr, 80)
+		resShort := truncate(resStr, 80)
+
+		if err != nil {
 			slog.Error("Agent processing failed", "agent", a.Name(), "error", err)
-			w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "failed", err.Error())
+			errDetails := fmt.Sprintf("Request: %s | Content: %s | Status: FAILED | Size: %d bytes | Error: %v", reqShort, resShort, len(resStr), err)
+			w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "failed", errDetails)
 			http.Error(rw, "processing failed", http.StatusInternalServerError)
 			return
 		}
 
-		w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "completed", "")
+		details := fmt.Sprintf("Request: %s | Content: %s | Status: OK | Size: %d bytes", reqShort, resShort, len(resStr))
+		w.emitMonitoring(ctx, task.JobID, task.Resource.Name, a.Name(), "completed", details)
 
 		if nextTopic != "" {
 			nextData, _ := json.Marshal(task)
@@ -130,57 +149,62 @@ func (w *PubSubWorkflow) emitMonitoring(ctx context.Context, jobID, resourceName
 }
 
 // ProcessAggregation simulates resource discovery and data gathering.
-func ProcessAggregation(ctx context.Context, a agent.Agent, task *AgentTask) error {
+func ProcessAggregation(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error) {
 	prompt := fmt.Sprintf("Ingest configuration and IAM policies for GCP resource: %s (Type: %s, Project: %s) for %s compliance", task.Resource.Name, task.Resource.Type, task.Resource.ProjectID, task.Regulation)
-	_, err := a.Chat(ctx, prompt)
-	return err
+	res, err := a.Chat(ctx, prompt)
+	return prompt, res, err
 }
 
 // ProcessModeling generates a compliance model for the resource via the LLM agent.
-func ProcessModeling(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	model, err := a.Chat(ctx, fmt.Sprintf("Model %s compliance for GCP resource: %s", task.Regulation, task.Resource.Name))
+func ProcessModeling(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error) {
+	prompt := fmt.Sprintf("Model %s compliance for GCP resource: %s", task.Regulation, task.Resource.Name)
+	model, err := a.Chat(ctx, prompt)
 	task.Result.ComplianceModel = model
-	return err
+	return prompt, model, err
 }
 
 // ProcessValidation generates a detailed compliance report based on the model.
-func ProcessValidation(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	report, err := a.Chat(ctx, fmt.Sprintf("Validate %s compliance for model: %s", task.Regulation, task.Result.ComplianceModel))
+func ProcessValidation(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error) {
+	prompt := fmt.Sprintf("Validate %s compliance for model: %s", task.Regulation, task.Result.ComplianceModel)
+	report, err := a.Chat(ctx, prompt)
 	task.Result.ComplianceReport = report
-	return err
+	return prompt, report, err
 }
 
 // ProcessReview evaluates the compliance report to determine approval status.
-func ProcessReview(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	approval, err := a.Chat(ctx, fmt.Sprintf("Review compliance report: %s", task.Result.ComplianceReport))
+func ProcessReview(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error) {
+	prompt := fmt.Sprintf("Review compliance report: %s", task.Result.ComplianceReport)
+	approval, err := a.Chat(ctx, prompt)
 	task.Result.ApprovalStatus = approval
-	return err
+	return prompt, approval, err
 }
 
 // ProcessTagging suggests resource tags based on the compliance findings.
-func ProcessTagging(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	tags, err := a.Chat(ctx, fmt.Sprintf("Suggest tags for resource based on report: %s", task.Result.ComplianceReport))
+func ProcessTagging(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error) {
+	prompt := fmt.Sprintf("Suggest tags for resource based on report: %s", task.Result.ComplianceReport)
+	tags, err := a.Chat(ctx, prompt)
 	task.Result.Tags = tags
-	return err
+	return prompt, tags, err
 }
 
 // ProcessReporting converts agent output into a structured finding object.
-func ProcessReporting(ctx context.Context, a agent.Agent, task *AgentTask) error {
-	report, err := a.Chat(ctx, fmt.Sprintf("Generate a %s compliance report for resource: %s, with compliance status: %s and details: %s", task.Regulation, task.Resource.Name, task.Result.ApprovalStatus, task.Result.ComplianceReport))
+func ProcessReporting(ctx context.Context, a agent.Agent, task *AgentTask) (string, string, error) {
+	prompt := fmt.Sprintf("Generate a %s compliance report for resource: %s, with compliance status: %s and details: %s", task.Regulation, task.Resource.Name, task.Result.ApprovalStatus, task.Result.ComplianceReport)
+	report, err := a.Chat(ctx, prompt)
 	if err != nil {
-		return err
+		return prompt, report, err
 	}
 
 	cleanReport := sanitizeJSON(report)
 
 	var finding store.Finding
 	if err := json.Unmarshal([]byte(cleanReport), &finding); err != nil {
-		return fmt.Errorf("failed to unmarshal finding from report: %w (raw report: %s)", err, report)
+		return prompt, report, fmt.Errorf("failed to unmarshal finding from report: %w (raw report: %s)", err, report)
 	}
 	finding.Regulation = task.Regulation
 	task.Result.ApprovalStatus = finding.Status
 	task.Result.ComplianceReport = finding.Details
-	return nil
+	return prompt, report, nil
 }
 
 // sanitizeJSON cleans markdown formatting from LLM responses to ensure valid JSON.
