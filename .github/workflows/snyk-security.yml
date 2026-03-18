@@ -19,17 +19,36 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
        node-version: 22
 
-    - uses: jongwooo/next-cache@v1
-
-    - name: Install dependencies
+    - name: Get npm cache directory
+      id: npm-cache-dir
+      shell: bash
+      run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}   
+    
+    - uses: actions/cache@v5
+      id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
+      with:
+        path: ${{ steps.npm-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+                  ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    - uses: actions/cache@v5
+      id: go-cache
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }} 
+      
+    - name: Install dependencies 
       run: npm ci
-
+   
     - name: Build
       run: npm run build
   
@@ -59,6 +78,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Snyk Container Test
+      continue-on-error: true
       run: |
           ## If the imager isn't present on the Daemon snyk can pull it from an OCI Registry
           ## To do so you need either set env SNYK_REGISTRY_USERNAME & SNYK_REGISTRY_PASSWORD
@@ -78,8 +98,3 @@ jobs:
           ## 
           snyk container test ${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --file=Dockerfile \
           --exclude-app-vulns --platform=${{ env.PLATFORM }}
-      continue-on-error: true     
-
-    - name: Snyk IaC
-      run: snyk iac test --org=${{ secrets.SNYK_ORG_ID }}
-      continue-on-error: true

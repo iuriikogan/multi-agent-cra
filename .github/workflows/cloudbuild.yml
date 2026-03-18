@@ -24,10 +24,11 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
+      attestations: 'write'
 
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332' # actions/checkout@v4
+        uses: 'actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332' # actions/checkout@v
 
       - id: 'auth'
         name: 'Authenticate to Google Cloud'
@@ -58,7 +59,12 @@ jobs:
             --config=cloudbuild.yaml \
             --service-account="projects/${{ env.PROJECT_ID }}/serviceAccounts/compliance-build-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --substitutions="_TAG=${{ github.sha }},_DB_IP=${DB_IP}"
-
+      
+      - name: Attest
+        uses: actions/attest@v4
+        with:
+          subject-path: '${{ github.workspace }}/${{ github.event.repository.name }}'
+          
       - name: 'Show Cloud Run URLs'
         run: |
           echo "Server URL:"

@@ -42,10 +42,6 @@ graph TD
 
 The system implements full-stack observability using OpenTelemetry to provide end-to-end visibility into the asynchronous, multi-agent workflows.
 
-### Distributed Tracing Flow
-
-Trace context is propagated across service boundaries (including Pub/Sub) to maintain a single trace for each compliance assessment.
-
 ```mermaid
 sequenceDiagram
     participant Browser as Next.js Frontend

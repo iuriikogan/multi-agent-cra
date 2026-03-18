@@ -78,3 +78,7 @@ Ensure the following prerequisites are met:
 *   Google Cloud services enabled: `run.googleapis.com`, `cloudbuild.googleapis.com`, `artifactregistry.googleapis.com`, `secretmanager.googleapis.com`, `sqladmin.googleapis.com`.
 
 For instructions on deployment, refer to [DEPLOY.md](./DEPLOY.md).
+*   (Production) Google Cloud services enabled: run.googleapis.com, cloudbuild.googleapis.com, artifactregistry.googleapis.com, secretmanager.googleapis.com, sqladmin.googleapis.com, cloudtrace.googleapis.com.
+
+
+### [   Architecture](https://github.com/iuriikogan/Audit-Agent/blob/main/ARCHITECTURE.md)

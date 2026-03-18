@@ -136,7 +136,6 @@ To verify the deployment:
 
 1.  Local: Access the dashboard at `http://localhost:8080`.
 2.  Production: Follow the steps in the [Dashboard Authentication & Access](#dashboard-authentication--access) section to securely connect to the `compliance-server` URL. Using `gcloud run services proxy` is the recommended method for browser access.
-2.  Production: Follow the steps in the [Dashboard Authentication & Access](#dashboard-authentication--access) section to securely connect to the `compliance-server` URL. Using `gcloud run services proxy` is the recommended method for browser access.
 3.  Check Cloud Run logs to ensure both `compliance-server` and `compliance-worker` are running without initialization errors.
 
 ## Rollback
