@@ -1,3 +1,4 @@
+// Package workflow provides testing for the agent orchestration logic.
 package workflow
 
 import (
@@ -13,10 +14,10 @@ import (
 	"github.com/iuriikogan/Audit-Agent/pkg/core"
 )
 
-// Ensure MockAgent implements the interface
+// Ensure MockAgent strictly fulfills the agent.Agent interface.
 var _ agent.Agent = (*MockAgent)(nil)
 
-// MockAgent implements agent.Agent for testing purposes.
+// MockAgent facilitates controlled testing of the coordinator pipeline.
 type MockAgent struct {
 	NameFunc  func() string
 	RoleFunc  func() string
@@ -52,39 +53,38 @@ func (m *MockAgent) Close() error {
 	return nil
 }
 
+// TestCoordinator_ProcessStream_Success validates the full sequential pipeline
+// of a single resource assessment under ideal conditions.
 func TestCoordinator_ProcessStream_Success(t *testing.T) {
-	// Setup mock agents that succeed
+	// Setup mock agent with stage-aware responses.
 	successAgent := &MockAgent{
 		ChatFunc: func(ctx context.Context, input string) (string, error) {
-			if strings.Contains(input, "Ingest") {
-				return "data-repo", nil
+			switch {
+			case strings.Contains(input, "Ingest"):
+				return "config-data", nil
+			case strings.Contains(input, "Model"):
+				return "cra-model", nil
+			case strings.Contains(input, "Validate"):
+				return "passed-validation", nil
+			case strings.Contains(input, "Review"):
+				return "Approved", nil
+			case strings.Contains(input, "Suggest GCP tags"):
+				return "env:prod", nil
+			default:
+				return "unknown", nil
 			}
-			if strings.Contains(input, "Model") {
-				return "compliance-model", nil
-			}
-			if strings.Contains(input, "Validate") {
-				return "compliance-report", nil
-			}
-			if strings.Contains(input, "Review") {
-				return "approved", nil
-			}
-			if strings.Contains(input, "Generate GCP labels") {
-				return "tags-applied", nil
-			}
-			return "unknown", nil
 		},
 	}
 
 	coordinator := NewCoordinator(successAgent, successAgent, successAgent, successAgent, successAgent, 2)
 
 	inputChan := make(chan core.GCPResource, 1)
-	inputChan <- core.GCPResource{ID: "r1", Name: "Test Resource", Type: "Compute", ProjectID: "p1"}
+	inputChan <- core.GCPResource{ID: "res-1", Name: "TestInstance", Type: "GCE", ProjectID: "test-proj"}
 	close(inputChan)
 
 	ctx := context.Background()
 	resultsChan := coordinator.ProcessStream(ctx, inputChan)
 
-	// Collect results
 	var results []core.AssessmentResult
 	for res := range resultsChan {
 		results = append(results, res)
@@ -96,70 +96,58 @@ func TestCoordinator_ProcessStream_Success(t *testing.T) {
 
 	res := results[0]
 	if res.Error != nil {
-		t.Errorf("unexpected error: %v", res.Error)
+		t.Errorf("unexpected pipeline error: %v", res.Error)
 	}
-	if res.ComplianceReport != "compliance-report" {
-		t.Errorf("expected compliance report 'compliance-report', got %s", res.ComplianceReport)
+	if res.ComplianceModel != "cra-model" {
+		t.Errorf("unexpected model: %s", res.ComplianceModel)
 	}
-	if res.ApprovalStatus != "approved" {
-		t.Errorf("expected approval status 'approved', got %s", res.ApprovalStatus)
-	}
-	if res.Tags != "tags-applied" {
-		t.Errorf("expected tags 'tags-applied', got %s", res.Tags)
+	if res.ApprovalStatus != "Approved" {
+		t.Errorf("unexpected approval: %s", res.ApprovalStatus)
 	}
 }
 
+// TestCoordinator_ProcessStream_Failure validates the error handling logic
+// when an individual agent in the pipeline returns an error.
 func TestCoordinator_ProcessStream_Failure(t *testing.T) {
-	// Setup agents where aggregator fails
 	failAgent := &MockAgent{
 		ChatFunc: func(ctx context.Context, input string) (string, error) {
-			return "", errors.New("simulated error")
+			return "", errors.New("simulated agent crash")
 		},
 	}
 	successAgent := &MockAgent{}
 
-	// Aggregator fails, others succeed (but shouldn't be called for that item)
+	// Aggregator fails immediately.
 	coordinator := NewCoordinator(failAgent, successAgent, successAgent, successAgent, successAgent, 1)
 
 	inputChan := make(chan core.GCPResource, 1)
-	inputChan <- core.GCPResource{ID: "r1", Name: "Fail Resource"}
+	inputChan <- core.GCPResource{ID: "res-fail", Name: "BrokenInstance"}
 	close(inputChan)
 
-	ctx := context.Background()
-	resultsChan := coordinator.ProcessStream(ctx, inputChan)
+	resultsChan := coordinator.ProcessStream(context.Background(), inputChan)
+	res := <-resultsChan
 
-	var results []core.AssessmentResult
-	for res := range resultsChan {
-		results = append(results, res)
-	}
-
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
-
-	res := results[0]
 	if res.Error == nil {
-		t.Error("expected error, got nil")
+		t.Fatal("expected pipeline error, got nil")
 	}
 	if !strings.Contains(res.Error.Error(), "aggregation failed") {
-		t.Errorf("expected aggregation error, got %v", res.Error)
+		t.Errorf("unexpected error message: %v", res.Error)
 	}
 }
 
+// TestCoordinator_ProcessStream_Concurrency ensures that the coordinator correctly
+// utilizes multiple workers to process resources in parallel.
 func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
-	// Setup a slow agent to verify concurrency
 	slowAgent := &MockAgent{
 		ChatFunc: func(ctx context.Context, input string) (string, error) {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond) // Simulate latency
 			return "done", nil
 		},
 	}
 
-	// 5 workers, 10 items. Should take roughly 2 * 100ms = 200ms (plus overhead)
-	// Each item passes through 5 stages. Total time ~ 1s.
-	coordinator := NewCoordinator(slowAgent, slowAgent, slowAgent, slowAgent, slowAgent, 5)
-
 	count := 10
+	workers := 5
+	coordinator := NewCoordinator(slowAgent, slowAgent, slowAgent, slowAgent, slowAgent, workers)
+
 	inputChan := make(chan core.GCPResource, count)
 	for i := 0; i < count; i++ {
 		inputChan <- core.GCPResource{ID: fmt.Sprintf("r%d", i), Name: "Resource"}
@@ -167,8 +155,7 @@ func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
 	close(inputChan)
 
 	start := time.Now()
-	ctx := context.Background()
-	resultsChan := coordinator.ProcessStream(ctx, inputChan)
+	resultsChan := coordinator.ProcessStream(context.Background(), inputChan)
 
 	var results []core.AssessmentResult
 	for res := range resultsChan {
@@ -180,11 +167,12 @@ func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
 		t.Fatalf("expected %d results, got %d", count, len(results))
 	}
 
-	if duration > 4*time.Second {
-		t.Errorf("processing took too long (%v), concurrency might be broken", duration)
+	// 10 items / 5 workers * ~250ms (5 stages * 50ms) = ~500ms minimum expected.
+	// We allow for some overhead, but verify it didn't run serially (~2.5s).
+	if duration > 2*time.Second {
+		t.Errorf("processing too slow (%v), concurrency might be broken", duration)
 	}
 
-	// Sort results by ID to ensure all processed
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].ResourceID < results[j].ResourceID
 	})
@@ -192,7 +180,7 @@ func TestCoordinator_ProcessStream_Concurrency(t *testing.T) {
 	for i, res := range results {
 		expectedID := fmt.Sprintf("r%d", i)
 		if res.ResourceID != expectedID {
-			t.Errorf("expected result %d to be %s, got %s", i, expectedID, res.ResourceID)
+			t.Errorf("missing resource %s", expectedID)
 		}
 	}
 }

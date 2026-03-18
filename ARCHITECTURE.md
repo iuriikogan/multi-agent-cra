@@ -2,16 +2,16 @@
 
 This document describes the technical architecture of the Multi-Agent Regulatory Compliance System (supporting CRA and DORA).
 
-### [Deployment Instructions](https://github.com/iuriikogan/Audit-Agent/blob/main/DEPLOY.md)
+### [Deployment Instructions](./DEPLOY.md)
 
 ## High-Level System Architecture
 
-The system is deployed as a single compiled Go binary that adapts its behavior based on the `ROLE` environment variable, enabling independent scaling of the API/UI and background processing workloads on Google Cloud Run.
+The system is deployed as a single compiled Go binary that adapts its behavior based on the `ROLE` environment variable, enabling independent scaling of the API/UI and background processing workloads on Google Cloud Run. The Next.js frontend is compiled and embedded statically within this Go binary.
 
 ```mermaid
 graph TD
     User([Security Engineer]) -->|HTTPS| CloudArmor[Cloud Armor WAF]
-    CloudArmor --> Server[Cloud Run: API/UI Server]
+    CloudArmor --> Server[Cloud Run: API/UI Server + Next.js UI]
     
     Server -->|Read/Write| DB[(Cloud SQL / SQLite)]
     Server -->|Publish Scan| PubSub_Scan[Pub/Sub: scan-requests]
@@ -24,7 +24,7 @@ graph TD
     
     PubSub_Monitoring -->|Consume| Server
     
-    WorkerFleet <-->|Agent Reasoning| Gemini[Google Gemini API]
+    WorkerFleet <-->|Agent Reasoning| Gemini[Google Gemini API / GenAI SDK]
     WorkerFleet -->|Embedded Context| KB[(Regulatory KB: CRA & DORA)]
     WorkerFleet <-->|Discover/Tag| GCP_API[GCP Asset Inventory API]
 
@@ -58,7 +58,7 @@ sequenceDiagram
 
     PubSub-->>Worker: Pull Message (Extract Context)
     Worker->>Worker: Start Processing Span
-    Worker->>Worker: Agent Reasoning (Gemini)
+    Worker->>Worker: Agent Reasoning (Gemini GenAI SDK)
     Worker->>Trace: Export Worker Spans
 ```
 
@@ -68,7 +68,7 @@ By injecting `logging.googleapis.com/trace` and `logging.googleapis.com/spanId` 
 
 ## Agent Pipeline & Data Flow
 
-The compliance process is a multi-stage, event-driven pipeline where autonomous AI agents perform specific roles.
+The compliance process is a multi-stage, event-driven pipeline where autonomous AI agents perform specific roles sequentially. Information is aggregated into a final `AssessmentResult` struct (including Compliance Model, Status, Regulation, and specific Approval findings).
 
 ```mermaid
 sequenceDiagram
@@ -80,6 +80,7 @@ sequenceDiagram
     participant Val as Agent: Validator
     participant Rev as Agent: Reviewer
     participant Tag as Agent: Tagger
+    participant Rep as Agent: Reporter
     participant DB as Cloud SQL
     participant GCP as GCP APIs
 
@@ -102,17 +103,21 @@ sequenceDiagram
     Val->>Val: Gemini Reasoning: Evaluate compliance rules
     Val->>KB: Semantic Search (search_knowledge_base)
     KB-->>Val: Relevant Regulatory Excerpts
-    Val->>DB: AddFinding(job_id, Finding)
     Val->>PS: Publish(validator-tasks, Validation_Result)
     
     PS-->>Rev: Consume(validator-tasks)
-    Rev->>Rev: Gemini Reasoning: Peer review validation logic
+    Rev->>Rev: Gemini Reasoning: Peer review validation logic (ApprovalStatus)
     Rev->>PS: Publish(reviewer-tasks, Reviewed_Result)
     
     PS-->>Tag: Consume(reviewer-tasks)
     Tag->>GCP: Apply compliance tags/labels (e.g., dora_status=compliant)
+    Tag->>PS: Publish(tagger-tasks, Tagged_Result)
+
+    PS-->>Rep: Consume(tagger-tasks)
+    Rep->>Rep: Gemini Reasoning: Generate final summary
+    Rep->>DB: AddFinding(job_id, AssessmentResult)
     
-    Note over Agg,Tag: All agents continuously publish telemetry to 'monitoring-events'
+    Note over Agg,Rep: All agents continuously publish telemetry to 'monitoring-events'
     PS-->>API: Consume(monitoring-events)
     API-->>UI: Server-Sent Events (SSE) Live Update
 ```
@@ -138,7 +143,7 @@ sequenceDiagram
 
 The system abstracts state management through a `Store` interface, allowing flexibility based on deployment needs:
 
-*   **Cloud SQL** Used for production. Provides robust, concurrent transaction support and complex querying capabilities for the CRA Dashboard. Database connections are secured via SSL and private IP.
-*   **SQLite (In-Memory):** Used for local development and CI/CD pipelines. It provides a zero-dependency, ephemeral database that perfectly mimics the relational structure of Cloud SQL.
+*   **Cloud SQL** Used for production. Provides robust, concurrent transaction support and complex querying capabilities for the CRA/DORA Dashboard. Database connections are secured via SSL and private IP.
+*   **SQLite (In-Memory):** Used for local development and CI/CD pipelines. It provides a zero-dependency, ephemeral database that mimics the relational structure of Cloud SQL.
 
 The frontend dashboard queries this state via the `/api/findings` endpoint, pulling historical compliance data independently of the real-time Pub/Sub pipeline.

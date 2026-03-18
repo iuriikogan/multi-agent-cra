@@ -1,28 +1,35 @@
+// Package store provides testing for the GCSStore implementation.
 package store
 
 import (
 	"testing"
 )
 
+// TestGCS_Paths verifies that the generated object paths for metadata and findings are correctly formatted.
 func TestGCS_Paths(t *testing.T) {
-	jobID := "test-job"
-	resource := "res-1"
+	s := &GCSStore{} // Shallow initialization for path tests.
+	jobID := "test-job-uuid"
+	resource := "test-compute-instance"
 
-	gotMetadata := metadataPath(jobID)
-	wantMetadata := "scans/test-job/metadata.json"
-	if gotMetadata != wantMetadata {
-		t.Errorf("metadataPath() = %q, want %q", gotMetadata, wantMetadata)
-	}
+	t.Run("MetadataPath", func(t *testing.T) {
+		gotMetadata := s.metadataPath(jobID)
+		wantMetadata := "scans/test-job-uuid/metadata.json"
+		if gotMetadata != wantMetadata {
+			t.Errorf("metadataPath() = %q, want %q", gotMetadata, wantMetadata)
+		}
+	})
 
-	gotFinding := findingPath(jobID, resource)
-	wantFinding := "scans/test-job/findings/res-1.json"
-	if gotFinding != wantFinding {
-		t.Errorf("findingPath() = %q, want %q", gotFinding, wantFinding)
-	}
+	t.Run("FindingPath", func(t *testing.T) {
+		gotFinding := s.findingPath(jobID, resource)
+		wantFinding := "scans/test-job-uuid/findings/test-compute-instance.json"
+		if gotFinding != wantFinding {
+			t.Errorf("findingPath() = %q, want %q", gotFinding, wantFinding)
+		}
+	})
 }
 
+// TestGCSStore_Compilation verifies that GCSStore correctly fulfills the Store interface.
 func TestGCSStore_Compilation(t *testing.T) {
-	// Smoke test for the GCSStore struct and its methods.
-	// We don't initialize a real client here.
-	var _ = &GCSStore{}
+	// A compilation check for the GCSStore struct.
+	var _ Store = (*GCSStore)(nil)
 }

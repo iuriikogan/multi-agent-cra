@@ -22,15 +22,30 @@ func main() {
 		log.Fatal("GEMINI_API_KEY environment variable is not set")
 	}
 
+	inputFile := os.Getenv("EMBEDDING_INPUT_FILE")
+	if inputFile == "" {
+		log.Fatal("EMBEDDING_INPUT_FILE environment variable is not set")
+	}
+
+	outputFile := os.Getenv("EMBEDDING_OUTPUT_FILE")
+	if outputFile == "" {
+		log.Fatal("EMBEDDING_OUTPUT_FILE environment variable is not set")
+	}
+
+	modelName := os.Getenv("EMBEDDING_MODEL")
+	if modelName == "" {
+		modelName = "text-embedding-004"
+	}
+
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
 	if err != nil {
 		log.Fatalf("Failed to create genai client: %v", err)
 	}
 
-	content, err := os.ReadFile("dora_text.txt")
+	content, err := os.ReadFile(inputFile)
 	if err != nil {
-		log.Fatalf("Failed to read dora_text.txt: %v", err)
+		log.Fatalf("Failed to read input file %s: %v", inputFile, err)
 	}
 
 	text := string(content)
@@ -51,13 +66,13 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Generating embeddings for %d chunks...\n", len(chunks))
+	fmt.Printf("Generating embeddings for %d chunks using model %s...\n", len(chunks), modelName)
 
 	var knowledgeBase []Chunk
 
 	for i, c := range chunks {
 		fmt.Printf("Embedding chunk %d/%d...\n", i+1, len(chunks))
-		res, err := client.Models.EmbedContent(ctx, "text-embedding-004", genai.Text(c), nil)
+		res, err := client.Models.EmbedContent(ctx, modelName, genai.Text(c), nil)
 		if err != nil {
 			log.Fatalf("Failed to embed chunk %d: %v", i, err)
 		}
@@ -67,7 +82,6 @@ func main() {
 		})
 	}
 
-	outputFile := "pkg/knowledge/dora_kb.json"
 	data, err := json.MarshalIndent(knowledgeBase, "", "  ")
 	if err != nil {
 		log.Fatalf("Failed to marshal knowledge base: %v", err)

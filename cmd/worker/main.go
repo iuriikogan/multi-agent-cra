@@ -83,10 +83,12 @@ func main() {
 		}
 		storeClient, err = store.NewCloudSQL(ctx, cfg.DatabaseURL)
 	case "SQLITE_MEM":
-		storeClient, err = store.NewSQLite(ctx, ":memory:")
+		storeClient, err = store.NewSQLite(ctx, "file:audit.db?cache=shared")
 	default:
 		if cfg.StoreType == "cloudsql" {
 			storeClient, err = store.NewCloudSQL(ctx, cfg.DatabaseURL)
+		} else if cfg.StoreType == "sqlite" {
+			storeClient, err = store.NewSQLite(ctx, cfg.DatabaseURL)
 		} else {
 			storeClient, err = store.NewGCS(ctx, cfg.GCSBucketName)
 		}

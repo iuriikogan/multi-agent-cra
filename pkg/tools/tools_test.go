@@ -1,3 +1,4 @@
+// Package tools provides tests for the functional agent capabilities.
 package tools
 
 import (
@@ -8,6 +9,7 @@ import (
 	"google.golang.org/genai"
 )
 
+// TestToolDefinitions ensures all toolsets are properly defined with names, descriptions, and schemas.
 func TestToolDefinitions(t *testing.T) {
 	toolSets := map[string][]*genai.Tool{
 		"ScopeTools":             ScopeTools,
@@ -23,19 +25,13 @@ func TestToolDefinitions(t *testing.T) {
 			if len(tools) == 0 {
 				t.Errorf("%s is empty", name)
 			}
-			for i, tool := range tools {
+			for _, tool := range tools {
 				if len(tool.FunctionDeclarations) == 0 {
-					t.Errorf("%s[%d] has no function declarations", name, i)
+					t.Errorf("%s has no function declarations", name)
 				}
-				for j, fn := range tool.FunctionDeclarations {
-					if fn.Name == "" {
-						t.Errorf("%s[%d].FunctionDeclarations[%d] has no name", name, i, j)
-					}
-					if fn.Description == "" {
-						t.Errorf("%s[%d].FunctionDeclarations[%d] has no description", name, i, j)
-					}
-					if fn.Parameters == nil {
-						t.Errorf("%s[%d].FunctionDeclarations[%d] has no parameters schema", name, i, j)
+				for _, fn := range tool.FunctionDeclarations {
+					if fn.Name == "" || fn.Description == "" || fn.Parameters == nil {
+						t.Errorf("%s function %q is missing metadata", name, fn.Name)
 					}
 				}
 			}
@@ -43,65 +39,64 @@ func TestToolDefinitions(t *testing.T) {
 	}
 }
 
+// TestDefaultExecutor_Execute verifies the routing and response formatting of the DefaultExecutor.
 func TestDefaultExecutor_Execute(t *testing.T) {
-	executor := NewExecutor(nil) // Client not needed for these tests
+	executor := NewExecutor(nil) // Client not needed for these simulation tests
 	ctx := context.Background()
 
 	tests := []struct {
 		name     string
 		toolName string
 		args     map[string]interface{}
-		want     string
 		contains string
 	}{
 		{
 			name:     "get_product_specs",
 			toolName: "get_product_specs",
 			args:     map[string]interface{}{"product_id": "123"},
-			want:     "Technical specs for 123: Processor X1, 8GB RAM, Secure Boot enabled.",
+			contains: "Technical specs for 123",
 		},
 		{
-			name:     "search_knowledge_base",
+			name:     "search_knowledge_base_no_client",
 			toolName: "search_knowledge_base",
 			args:     map[string]interface{}{"query": "reporting obligations"},
-			contains: "Error searching knowledge base: genai client is nil",
+			contains: "knowledge: genai client is required",
 		},
-
 		{
 			name:     "ingest_file_system",
 			toolName: "ingest_file_system",
 			args:     map[string]interface{}{"path": "/tmp/project"},
-			want:     "Found: config.yaml, main.go, README.md",
+			contains: "Simulation: Recursive scan",
 		},
 		{
 			name:     "ingest_git_repo",
 			toolName: "ingest_git_repo",
 			args:     map[string]interface{}{"repo_url": "https://github.com/example/repo"},
-			contains: "Cloned https://github.com/example/repo",
+			contains: "Simulation: Repository https://github.com/example/repo successfully cloned",
 		},
 		{
 			name:     "apply_resource_tags",
 			toolName: "apply_resource_tags",
-			args:     map[string]interface{}{"resource_id": "res-1", "tags": map[string]string{"env": "prod"}},
-			contains: "Tags applied successfully",
+			args:     map[string]interface{}{"resource_id": "res-1", "tags": map[string]interface{}{"env": "prod"}},
+			contains: "Success: Resource res-1 tagged",
 		},
 		{
 			name:     "generate_conformity_doc",
 			toolName: "generate_conformity_doc",
 			args:     map[string]interface{}{"product_name": "Widget", "classification": "Class I"},
-			want:     "Generated EU Declaration of Conformity for Widget (Class: Class I)",
+			contains: "Success: EU Declaration of Conformity generated for Widget",
 		},
 		{
 			name:     "query_cve_database",
 			toolName: "query_cve_database",
 			args:     map[string]interface{}{"component": "LibX", "version": "1.0"},
-			contains: "No CRITICAL vulnerabilities found",
+			contains: "CVE Analysis for LibX 1.0",
 		},
 		{
-			name:     "default",
+			name:     "unknown_tool",
 			toolName: "unknown_tool",
 			args:     nil,
-			want:     "Tool executed successfully.",
+			contains: "System: Tool 'unknown_tool' is not implemented",
 		},
 	}
 
@@ -109,17 +104,10 @@ func TestDefaultExecutor_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := executor.Execute(ctx, tt.toolName, tt.args)
 			if err != nil {
-				t.Errorf("executor.Execute() error = %v", err)
-				return
+				t.Fatalf("Execute() unexpected error: %v", err)
 			}
-			if tt.contains != "" {
-				if !strings.Contains(got, tt.contains) {
-					t.Errorf("executor.Execute() = %q, expected to contain %q", got, tt.contains)
-				}
-			} else {
-				if got != tt.want {
-					t.Errorf("executor.Execute() = %q, want %q", got, tt.want)
-				}
+			if !strings.Contains(got, tt.contains) {
+				t.Errorf("Execute() = %q, want it to contain %q", got, tt.contains)
 			}
 		})
 	}

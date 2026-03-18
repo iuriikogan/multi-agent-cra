@@ -13,8 +13,8 @@ func TestRegisterRoutes_Compilation(t *testing.T) {
 	var _ = RegisterRoutes
 }
 
-func TestRunScan_Compilation(t *testing.T) {
-	var _ = runScan
+func TestRunDiscovery_Compilation(t *testing.T) {
+	var _ = runDiscovery
 }
 
 func TestWorker_Routes(t *testing.T) {

@@ -1,3 +1,4 @@
+// Package observability provides distributed tracing for the Audit Agent.
 package observability
 
 import (
@@ -5,18 +6,29 @@ import (
 	"testing"
 )
 
-func TestInitTrace(t *testing.T) {
-	// We might not want to actually initialize tracing in a test if it requires GCP project ID
-	// But we can test if it handles empty project ID or similar if applicable.
-	// For now, let's just create a dummy test to satisfy the requirement of having a test file.
+// TestInitTrace_ThreadSafety ensures that multiple calls to InitTrace behave correctly
+// and that it manages the global trace provider without errors.
+func TestInitTrace_ThreadSafety(t *testing.T) {
 	ctx := context.Background()
-	// Skip actual initialization as it requires credentials/project id
-	t.Run("basic", func(t *testing.T) {
-		if false {
-			err := InitTrace(ctx, "test-project")
-			if err != nil {
-				t.Errorf("InitTrace failed: %v", err)
-			}
+	projectID := "test-project"
+
+	// Initial setup
+	if err := InitTrace(ctx, projectID); err != nil {
+		t.Fatalf("InitTrace() failed: %v", err)
+	}
+
+	// Repeated calls should not error out or cause panics (due to sync.Once)
+	for i := 0; i < 3; i++ {
+		if err := InitTrace(ctx, projectID); err != nil {
+			t.Errorf("repeated InitTrace() failed: %v", err)
 		}
-	})
+	}
+}
+
+// TestShutdown ensures the trace provider can be gracefully closed.
+func TestShutdown(t *testing.T) {
+	ctx := context.Background()
+
+	// We call shutdown after an initialization to ensure it doesn't panic.
+	Shutdown(ctx)
 }

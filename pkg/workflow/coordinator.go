@@ -1,4 +1,8 @@
-// Package workflow implements the core orchestration logic for specialized agents.
+// Package workflow implements the core orchestration logic for specialized agents in the compliance system.
+//
+// Rationale: This package provides both a synchronous/concurrent local coordinator and an
+// asynchronous Pub/Sub-driven workflow engine. This flexibility allows the system to scale
+// from local CLI assessments to high-throughput cloud-native pipelines.
 package workflow
 
 import (
@@ -12,17 +16,22 @@ import (
 	"github.com/iuriikogan/Audit-Agent/pkg/core"
 )
 
-// Coordinator orchestrates the sequential execution of specialized agents.
+// Coordinator orchestrates the sequential execution of specialized agents for local processing.
+// It manages a pool of worker goroutines to process resource assessments in parallel.
 type Coordinator struct {
-	aggregator  agent.Agent // Agent responsible for data gathering
-	modeler     agent.Agent // Agent responsible for compliance modeling
-	validator   agent.Agent // Agent responsible for rule validation
-	reviewer    agent.Agent // Agent responsible for assessment review
-	tagger      agent.Agent // Agent responsible for resource tagging
-	concurrency int         // Number of concurrent worker goroutines
+	aggregator  agent.Agent // Agent responsible for gathering resource configuration and IAM data.
+	modeler     agent.Agent // Agent responsible for mapping configuration to regulatory requirements.
+	validator   agent.Agent // Agent responsible for evaluating compliance rules and generating reports.
+	reviewer    agent.Agent // Agent responsible for peer-reviewing the validator's findings.
+	tagger      agent.Agent // Agent responsible for suggesting resource tags based on compliance.
+	concurrency int         // The number of concurrent worker goroutines in the pool.
 }
 
-// NewCoordinator initializes a new workflow coordinator with specialized agents and worker count.
+// NewCoordinator initializes a new workflow coordinator with a specialized agent swarm.
+//
+// Parameters:
+//   - aggregator, modeler, validator, reviewer, tagger: Instances of specialized agents.
+//   - workers: The number of concurrent assessment pipelines to run. Defaults to 1 if <= 0.
 func NewCoordinator(aggregator, modeler, validator, reviewer, tagger agent.Agent, workers int) *Coordinator {
 	if workers <= 0 {
 		workers = 1
@@ -37,11 +46,16 @@ func NewCoordinator(aggregator, modeler, validator, reviewer, tagger agent.Agent
 	}
 }
 
-// ProcessStream concurrently assesses a stream of resources and returns results.
-// It takes a context and an input channel of resources, returning an output channel of assessment results.
+// ProcessStream facilitates the concurrent assessment of a stream of GCP resources.
+// It returns a channel that emits results as they are completed by the agent swarm.
+//
+// Parameters:
+//   - ctx: Context to manage the lifecycle of the entire stream processing.
+//   - input: A read-only channel of GCP resources to be assessed.
 func (c *Coordinator) ProcessStream(ctx context.Context, input <-chan core.GCPResource) <-chan core.AssessmentResult {
 	results := make(chan core.AssessmentResult)
 
+	// Spawn the worker group.
 	go func() {
 		defer close(results)
 		var wg sync.WaitGroup
@@ -55,30 +69,35 @@ func (c *Coordinator) ProcessStream(ctx context.Context, input <-chan core.GCPRe
 		}
 		wg.Wait()
 	}()
+
 	return results
 }
 
-// workerLoop processes resources from the input channel until closed or context is cancelled.
+// workerLoop continuously pulls resources from the input channel and pipes them through the agent swarm.
 func (c *Coordinator) workerLoop(ctx context.Context, id int, input <-chan core.GCPResource, output chan<- core.AssessmentResult) {
-	slog.Debug("Worker started", "worker_id", id)
-	defer slog.Debug("Worker stopped", "worker_id", id)
+	slog.Debug("workflow: worker started", "worker_id", id)
+	defer slog.Debug("workflow: worker stopped", "worker_id", id)
 
-	for r := range input {
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case r, ok := <-input:
+			if !ok {
+				return
+			}
+			// Analyze the resource and push the result to the output channel.
+			output <- c.analyzeResource(ctx, r)
 		}
-
-		res := c.analyzeResource(ctx, r)
-		output <- res
 	}
 }
 
-// analyzeResource executes the full agent pipeline for a single GCP resource.
+// analyzeResource executes the 5-stage agent pipeline for a single GCP resource.
+// Each stage is given a timeout to prevent an individual agent from blocking the pipeline.
 func (c *Coordinator) analyzeResource(ctx context.Context, r core.GCPResource) core.AssessmentResult {
-	slog.Info("Analyzing resource", "resource", r.Name, "type", r.Type)
+	slog.Info("workflow: analyzing resource", "resource", r.Name, "type", r.Type)
 
+	// Initialize the result with resource metadata.
 	res := core.AssessmentResult{
 		ResourceID:   r.ID,
 		ResourceName: r.Name,
@@ -86,70 +105,64 @@ func (c *Coordinator) analyzeResource(ctx context.Context, r core.GCPResource) c
 		ProjectID:    r.ProjectID,
 	}
 
-	// 1. Resource Aggregation
-	stepCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
+	// Define assessment timeout (2 minutes per agent stage).
+	stageTimeout := 2 * time.Minute
 
-	slog.Debug("Step 1: Resource Aggregator", "resource", r.Name)
-	prompt := fmt.Sprintf("Ingest configuration and IAM policies for GCP resource: %s (Type: %s, Project: %s, Region: %s)", r.Name, r.Type, r.ProjectID, r.Region)
-	dataRepo, err := c.aggregator.Chat(stepCtx, prompt)
-	if err != nil {
-		slog.Error("Aggregation failed", "resource", r.Name, "error", err)
-		res.Error = fmt.Errorf("aggregation failed: %w", err)
-		return res
+	// Stage 1: Resource Aggregator (Discovery & Ingestion)
+	{
+		stepCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+		defer cancel()
+
+		slog.Debug("workflow: step 1 (Aggregator)", "resource", r.Name)
+		prompt := fmt.Sprintf("Ingest configuration and IAM policies for GCP resource: %s (Type: %s, Project: %s, Region: %s)",
+			r.Name, r.Type, r.ProjectID, r.Region)
+		dataRepo, err := c.aggregator.Chat(stepCtx, prompt)
+		if err != nil {
+			slog.Error("workflow: aggregation failed", "resource", r.Name, "error", err)
+			res.Error = fmt.Errorf("aggregation failed: %w", err)
+			return res
+		}
+
+		// Stage 2: Compliance Modeler (Context Mapping)
+		slog.Debug("workflow: step 2 (Modeler)", "resource", r.Name)
+		complianceModel, err := c.modeler.Chat(stepCtx, fmt.Sprintf("Model regulatory compliance requirements for resource configuration: %s", dataRepo))
+		if err != nil {
+			slog.Error("workflow: modeling failed", "resource", r.Name, "error", err)
+			res.Error = fmt.Errorf("modeling failed: %w", err)
+			return res
+		}
+		res.ComplianceModel = complianceModel
+
+		// Stage 3: Compliance Validator (Rule Evaluation)
+		slog.Debug("workflow: step 3 (Validator)", "resource", r.Name)
+		complianceReport, err := c.validator.Chat(stepCtx, fmt.Sprintf("Validate compliance against regulatory rules for model: %s", complianceModel))
+		if err != nil {
+			slog.Error("workflow: validation failed", "resource", r.Name, "error", err)
+			res.Error = fmt.Errorf("validation failed: %w", err)
+			return res
+		}
+		res.ComplianceReport = complianceReport
+
+		// Stage 4: Assessment Reviewer (Verification)
+		slog.Debug("workflow: step 4 (Reviewer)", "resource", r.Name)
+		approval, err := c.reviewer.Chat(stepCtx, fmt.Sprintf("Review compliance findings for resource: %s", complianceReport))
+		if err != nil {
+			slog.Error("workflow: review failed", "resource", r.Name, "error", err)
+			res.Error = fmt.Errorf("review failed: %w", err)
+			return res
+		}
+		res.ApprovalStatus = approval
+
+		// Stage 5: Resource Tagger (Governance)
+		slog.Debug("workflow: step 5 (Tagger)", "resource", r.Name)
+		tags, err := c.tagger.Chat(stepCtx, fmt.Sprintf("Suggest GCP tags/labels for resource based on final report: %s", complianceReport))
+		if err != nil {
+			slog.Error("workflow: tagging failed", "resource", r.Name, "error", err)
+			res.Error = fmt.Errorf("tagging failed: %w", err)
+			return res
+		}
+		res.Tags = tags
 	}
-
-	// 2. CRA Modeling
-	stepCtx, cancel = context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	slog.Debug("Step 2: CRA Modeler", "resource", r.Name)
-	complianceModel, err := c.modeler.Chat(stepCtx, fmt.Sprintf("Model CRA compliance for GCP resource configuration: %s", dataRepo))
-	if err != nil {
-		slog.Error("Modeling failed", "resource", r.Name, "error", err)
-		res.Error = fmt.Errorf("modeling failed: %w", err)
-		return res
-	}
-	res.ComplianceModel = complianceModel
-
-	// 3. Compliance Validation
-	stepCtx, cancel = context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	slog.Debug("Step 3: Compliance Validator", "resource", r.Name)
-	complianceReport, err := c.validator.Chat(stepCtx, fmt.Sprintf("Validate GCP resource compliance against CRA rules: %s", complianceModel))
-	if err != nil {
-		slog.Error("Validation failed", "resource", r.Name, "error", err)
-		res.Error = fmt.Errorf("validation failed: %w", err)
-		return res
-	}
-	res.ComplianceReport = complianceReport
-
-	// 4. Assessment Review
-	stepCtx, cancel = context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	slog.Debug("Step 4: Reviewer", "resource", r.Name)
-	approval, err := c.reviewer.Chat(stepCtx, fmt.Sprintf("Review compliance report for GCP resource: %s", complianceReport))
-	if err != nil {
-		slog.Error("Review failed", "resource", r.Name, "error", err)
-		res.Error = fmt.Errorf("review failed: %w", err)
-		return res
-	}
-	res.ApprovalStatus = approval
-
-	// 5. Resource Tagging
-	stepCtx, cancel = context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	slog.Debug("Step 5: Resource Tagger", "resource", r.Name)
-	tags, err := c.tagger.Chat(stepCtx, fmt.Sprintf("Generate GCP labels/tags for resource based on report: %s", complianceReport))
-	if err != nil {
-		slog.Error("Tagging failed", "resource", r.Name, "error", err)
-		res.Error = fmt.Errorf("tagging failed: %w", err)
-		return res
-	}
-	res.Tags = tags
 
 	return res
 }
