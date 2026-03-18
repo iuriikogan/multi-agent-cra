@@ -64,7 +64,7 @@ sequenceDiagram
 
 ### Log-Trace Correlation
 
-By injecting `logging.googleapis.com/trace` and `logging.googleapis.com/spanId` into structured JSON logs, the system enables seamless navigation between logs and traces in the Google Cloud Console. This is critical for debugging the asynchronous behavior of the multi-agent pipeline.
+By injecting `logging.googleapis.com/trace` and `logging.googleapis.com/spanId` into structured JSON logs, this is critical for debugging the asynchronous behavior of the multi-agent pipeline.
 
 ## Agent Pipeline & Data Flow
 
